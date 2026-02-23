@@ -1,0 +1,17 @@
+# Backend
+backend/server
+backend/backend
+backend/*.test
+
+# Frontend dependencies and build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.bun/
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+*.swp
