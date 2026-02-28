@@ -1,4 +1,22 @@
 services:
+  postgres:
+    image: docker.io/library/postgres:16-alpine
+    container_name: invoice-postgres
+    environment:
+      POSTGRES_USER: invoiceuser
+      POSTGRES_PASSWORD: invoicepassword
+      POSTGRES_DB: invoicedb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U invoiceuser -d invoicedb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -6,6 +24,15 @@ services:
     container_name: invoice-backend
     ports:
       - "8080:8080"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: invoiceuser
+      DB_PASSWORD: invoicepassword
+      DB_NAME: invoicedb
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
@@ -14,7 +41,10 @@ services:
       dockerfile: Dockerfile
     container_name: invoice-frontend
     ports:
-      - "80:80"
+      - "3000:80"
     depends_on:
       - backend
     restart: unless-stopped
+
+volumes:
+  postgres_data:

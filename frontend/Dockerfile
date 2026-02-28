@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM oven/bun:1.1 AS builder
+FROM docker.io/oven/bun:1.1 AS builder
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY . .
 RUN bun run build
 
 # Stage 2: Production image (served by nginx)
-FROM nginx:1.27-alpine
+FROM docker.io/library/nginx:1.27-alpine
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
