@@ -7,13 +7,17 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	migrate "github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // InvoiceItem represents a single line item in an invoice.
@@ -31,8 +35,42 @@ type Invoice struct {
 	Items       []InvoiceItem `json:"items"`
 	TaxRate     float64       `json:"tax_rate"`
 	TotalAmount float64       `json:"total_amount"`
+	UserID      string        `json:"user_id"`
 	CreatedAt   time.Time     `json:"created_at"`
 	UpdatedAt   time.Time     `json:"updated_at"`
+}
+
+// User represents a user account.
+type User struct {
+	ID        string    `json:"id"`
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// SignupRequest for user registration
+type SignupRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8"`
+}
+
+// LoginRequest for user login
+type LoginRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
+}
+
+// AuthResponse contains token and user info
+type AuthResponse struct {
+	Token string `json:"token"`
+	User  User   `json:"user"`
+}
+
+// CustomClaims for JWT token
+type CustomClaims struct {
+	UserID string `json:"user_id"`
+	Email  string `json:"email"`
+	jwt.RegisteredClaims
 }
 
 // round2 rounds a float to 2 decimal places.
@@ -47,6 +85,101 @@ func calculateTotal(items []InvoiceItem, taxRate float64) float64 {
 		subtotal += item.Qty * item.Price
 	}
 	return round2(subtotal + subtotal*taxRate/100)
+}
+
+// hashPassword hashes a password using bcrypt
+func hashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(hash), err
+}
+
+// verifyPassword verifies a password against a hash
+func verifyPassword(hash, password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
+// generateJWT generates a JWT token for a user
+func generateJWT(userID, email string) (string, error) {
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "your-secret-key-change-in-production-use-min-32-chars"
+	}
+
+	expirationStr := os.Getenv("JWT_EXPIRATION")
+	if expirationStr == "" {
+		expirationStr = "900" // 15 minutes default
+	}
+
+	expirationSeconds, _ := strconv.Atoi(expirationStr)
+
+	claims := CustomClaims{
+		UserID: userID,
+		Email:  email,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expirationSeconds) * time.Second)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(jwtSecret))
+}
+
+// validateJWT validates and parses a JWT token
+func validateJWT(tokenString string) (*CustomClaims, error) {
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "your-secret-key-change-in-production-use-min-32-chars"
+	}
+
+	claims := &CustomClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(jwtSecret), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !token.Valid {
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	return claims, nil
+}
+
+// authenticate is a Gin middleware that validates JWT token
+func authenticate() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
+			c.Abort()
+			return
+		}
+
+		// Extract token from "Bearer <token>"
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
+			c.Abort()
+			return
+		}
+
+		token := parts[1]
+		claims, err := validateJWT(token)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+			c.Abort()
+			return
+		}
+
+		// Store user info in context
+		c.Set("user_id", claims.UserID)
+		c.Set("email", claims.Email)
+		c.Next()
+	}
 }
 
 // runMigrations runs the database migrations
@@ -95,7 +228,7 @@ func main() {
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
@@ -103,14 +236,138 @@ func main() {
 		c.Next()
 	})
 
-	api := r.Group("/api/invoices")
+	// Auth routes (no authentication required)
+	auth := r.Group("/api/auth")
 	{
-		// List all invoices
-		api.GET("", func(c *gin.Context) {
+		// Register new user
+		auth.POST("/register", func(c *gin.Context) {
+			var req SignupRequest
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 			defer cancel()
 
-			rows, err := db.Query(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, created_at, updated_at FROM invoices ORDER BY created_at DESC")
+			// Check if email already exists
+			var exists bool
+			err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)", req.Email).Scan(&exists)
+			if err != nil || exists {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "email already registered"})
+				return
+			}
+
+			// Hash password
+			hash, err := hashPassword(req.Password)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to process password"})
+				return
+			}
+
+			// Create user
+			userID := uuid.New().String()
+			now := time.Now()
+			_, err = db.Exec(ctx,
+				"INSERT INTO users (id, email, password_hash, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)",
+				userID, req.Email, hash, now, now,
+			)
+			if err != nil {
+				log.Printf("insert user error: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
+				return
+			}
+
+			// Generate JWT
+			token, err := generateJWT(userID, req.Email)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+				return
+			}
+
+			resp := AuthResponse{
+				Token: token,
+				User: User{
+					ID:        userID,
+					Email:     req.Email,
+					CreatedAt: now,
+					UpdatedAt: now,
+				},
+			}
+			c.JSON(http.StatusCreated, resp)
+		})
+
+		// Login user
+		auth.POST("/login", func(c *gin.Context) {
+			var req LoginRequest
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+			defer cancel()
+
+			// Find user by email
+			var user User
+			var passwordHash string
+			err := db.QueryRow(ctx, "SELECT id, email, password_hash, created_at, updated_at FROM users WHERE email = $1", req.Email).
+				Scan(&user.ID, &user.Email, &passwordHash, &user.CreatedAt, &user.UpdatedAt)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
+				return
+			}
+
+			// Verify password
+			if !verifyPassword(passwordHash, req.Password) {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
+				return
+			}
+
+			// Generate JWT
+			token, err := generateJWT(user.ID, user.Email)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+				return
+			}
+
+			resp := AuthResponse{
+				Token: token,
+				User:  user,
+			}
+			c.JSON(http.StatusOK, resp)
+		})
+
+		// Get current user (protected)
+		auth.GET("/me", authenticate(), func(c *gin.Context) {
+			userID, _ := c.Get("user_id")
+
+			ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+			defer cancel()
+
+			var user User
+			err := db.QueryRow(ctx, "SELECT id, email, created_at, updated_at FROM users WHERE id = $1", userID).
+				Scan(&user.ID, &user.Email, &user.CreatedAt, &user.UpdatedAt)
+			if err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+				return
+			}
+
+			c.JSON(http.StatusOK, user)
+		})
+	}
+
+	// Invoice routes (protected)
+	api := r.Group("/api/invoices")
+	api.Use(authenticate())
+	{
+		// List all invoices for current user
+		api.GET("", func(c *gin.Context) {
+			userID, _ := c.Get("user_id")
+			ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+			defer cancel()
+
+			rows, err := db.Query(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE user_id = $1 ORDER BY created_at DESC", userID)
 			if err != nil {
 				log.Printf("query error: %v", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch invoices"})
@@ -121,7 +378,7 @@ func main() {
 			var invoices []Invoice
 			for rows.Next() {
 				var inv Invoice
-				if err := rows.Scan(&inv.ID, &inv.ClientName, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.CreatedAt, &inv.UpdatedAt); err != nil {
+				if err := rows.Scan(&inv.ID, &inv.ClientName, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt); err != nil {
 					log.Printf("scan error: %v", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse invoices"})
 					return
@@ -157,17 +414,60 @@ func main() {
 			}
 
 			c.JSON(http.StatusOK, invoices)
-		})
+			})
 
-		// Get a single invoice
-		api.GET("/:id", func(c *gin.Context) {
+			// Export all invoices to Excel (MUST be before /:id to avoid route conflict)
+			api.GET("/export/excel", func(c *gin.Context) {
+				userID, _ := c.Get("user_id")
+				ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+				defer cancel()
+
+				rows, err := db.Query(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE user_id = $1 ORDER BY created_at DESC", userID)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch invoices"})
+					return
+				}
+				defer rows.Close()
+
+				var invoices []Invoice
+				for rows.Next() {
+					var inv Invoice
+					if err := rows.Scan(&inv.ID, &inv.ClientName, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt); err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse invoices"})
+						return
+					}
+					var itemCount int
+					db.QueryRow(ctx, "SELECT COUNT(*) FROM invoice_items WHERE invoice_id = $1", inv.ID).Scan(&itemCount)
+					inv.Items = make([]InvoiceItem, itemCount)
+					invoices = append(invoices, inv)
+				}
+
+				if invoices == nil {
+					invoices = []Invoice{}
+				}
+
+				data, err := generateInvoicesExcel(invoices)
+				if err != nil {
+					log.Printf("excel generation error: %v", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate Excel"})
+					return
+				}
+
+				c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+				c.Header("Content-Disposition", "attachment; filename=invoices.xlsx")
+				c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+			})
+
+			// Get a single invoice (with ownership check)
+			api.GET("/:id", func(c *gin.Context) {
 			id := c.Param("id")
+			userID, _ := c.Get("user_id")
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 			defer cancel()
 
 			var inv Invoice
-			err := db.QueryRow(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, created_at, updated_at FROM invoices WHERE id = $1", id).
-				Scan(&inv.ID, &inv.ClientName, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.CreatedAt, &inv.UpdatedAt)
+			err := db.QueryRow(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
+				Scan(&inv.ID, &inv.ClientName, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
 			if err != nil {
 				c.JSON(http.StatusNotFound, gin.H{"error": "invoice not found"})
 				return
@@ -205,8 +505,11 @@ func main() {
 				return
 			}
 
+			userID, _ := c.Get("user_id")
+
 			// Generate new ID
 			input.ID = uuid.New().String()
+			input.UserID = userID.(string)
 			input.TotalAmount = calculateTotal(input.Items, input.TaxRate)
 			now := time.Now()
 			input.CreatedAt = now
@@ -226,8 +529,8 @@ func main() {
 
 			// Insert invoice
 			_, err = tx.Exec(ctx,
-				"INSERT INTO invoices (id, client_name, date, tax_rate, total_amount, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-				input.ID, input.ClientName, input.Date, input.TaxRate, input.TotalAmount, input.CreatedAt, input.UpdatedAt,
+				"INSERT INTO invoices (id, client_name, date, tax_rate, total_amount, user_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+				input.ID, input.ClientName, input.Date, input.TaxRate, input.TotalAmount, input.UserID, input.CreatedAt, input.UpdatedAt,
 			)
 			if err != nil {
 				log.Printf("insert invoice error: %v", err)
@@ -258,9 +561,10 @@ func main() {
 			c.JSON(http.StatusCreated, input)
 		})
 
-		// Update an existing invoice
+		// Update an existing invoice (with ownership check)
 		api.PUT("/:id", func(c *gin.Context) {
 			id := c.Param("id")
+			userID, _ := c.Get("user_id")
 			var input Invoice
 			if err := c.ShouldBindJSON(&input); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -268,15 +572,16 @@ func main() {
 			}
 
 			input.ID = id
+			input.UserID = userID.(string)
 			input.TotalAmount = calculateTotal(input.Items, input.TaxRate)
 			input.UpdatedAt = time.Now()
 
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 			defer cancel()
 
-			// Check if invoice exists
+			// Check if invoice exists and owned by user
 			var exists bool
-			err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM invoices WHERE id = $1)", id).Scan(&exists)
+			err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM invoices WHERE id = $1 AND user_id = $2)", id, userID).Scan(&exists)
 			if err != nil || !exists {
 				c.JSON(http.StatusNotFound, gin.H{"error": "invoice not found"})
 				return
@@ -332,8 +637,8 @@ func main() {
 
 			// Fetch and return updated invoice
 			var updatedInv Invoice
-			err = db.QueryRow(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, created_at, updated_at FROM invoices WHERE id = $1", id).
-				Scan(&updatedInv.ID, &updatedInv.ClientName, &updatedInv.Date, &updatedInv.TaxRate, &updatedInv.TotalAmount, &updatedInv.CreatedAt, &updatedInv.UpdatedAt)
+			err = db.QueryRow(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1", id).
+				Scan(&updatedInv.ID, &updatedInv.ClientName, &updatedInv.Date, &updatedInv.TaxRate, &updatedInv.TotalAmount, &updatedInv.UserID, &updatedInv.CreatedAt, &updatedInv.UpdatedAt)
 			if err != nil {
 				log.Printf("fetch updated invoice error: %v", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch updated invoice"})
@@ -364,15 +669,16 @@ func main() {
 			c.JSON(http.StatusOK, updatedInv)
 		})
 
-		// Delete an invoice
+		// Delete an invoice (with ownership check)
 		api.DELETE("/:id", func(c *gin.Context) {
 			id := c.Param("id")
+			userID, _ := c.Get("user_id")
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 			defer cancel()
 
-			// Check if invoice exists
+			// Check if invoice exists and owned by user
 			var exists bool
-			err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM invoices WHERE id = $1)", id).Scan(&exists)
+			err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM invoices WHERE id = $1 AND user_id = $2)", id, userID).Scan(&exists)
 			if err != nil || !exists {
 				c.JSON(http.StatusNotFound, gin.H{"error": "invoice not found"})
 				return
@@ -387,8 +693,94 @@ func main() {
 			}
 
 			c.JSON(http.StatusOK, gin.H{"message": "invoice deleted"})
-		})
-	}
+			})
 
-	r.Run(":8080")
+			// Download invoice as PDF
+			api.GET("/:id/pdf", func(c *gin.Context) {
+				id := c.Param("id")
+				userID, _ := c.Get("user_id")
+				ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+				defer cancel()
+
+				var inv Invoice
+				err := db.QueryRow(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
+					Scan(&inv.ID, &inv.ClientName, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
+				if err != nil {
+					c.JSON(http.StatusNotFound, gin.H{"error": "invoice not found"})
+					return
+				}
+
+				itemRows, err := db.Query(ctx, "SELECT description, qty, price FROM invoice_items WHERE invoice_id = $1 ORDER BY created_at", id)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch items"})
+					return
+				}
+				defer itemRows.Close()
+
+				for itemRows.Next() {
+					var item InvoiceItem
+					if err := itemRows.Scan(&item.Description, &item.Qty, &item.Price); err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse items"})
+						return
+					}
+					inv.Items = append(inv.Items, item)
+				}
+
+				pdfData, err := generateInvoicePDF(inv)
+				if err != nil {
+					log.Printf("pdf generation error: %v", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate PDF"})
+					return
+				}
+
+				c.Header("Content-Type", "application/pdf")
+				c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=invoice-%s.pdf", id[:8]))
+				c.Data(http.StatusOK, "application/pdf", pdfData)
+			})
+
+			// Download invoice as CSV
+			api.GET("/:id/csv", func(c *gin.Context) {
+				id := c.Param("id")
+				userID, _ := c.Get("user_id")
+				ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+				defer cancel()
+
+				var inv Invoice
+				err := db.QueryRow(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
+					Scan(&inv.ID, &inv.ClientName, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
+				if err != nil {
+					c.JSON(http.StatusNotFound, gin.H{"error": "invoice not found"})
+					return
+				}
+
+				itemRows, err := db.Query(ctx, "SELECT description, qty, price FROM invoice_items WHERE invoice_id = $1 ORDER BY created_at", id)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch items"})
+					return
+				}
+				defer itemRows.Close()
+
+				for itemRows.Next() {
+					var item InvoiceItem
+					if err := itemRows.Scan(&item.Description, &item.Qty, &item.Price); err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse items"})
+						return
+					}
+					inv.Items = append(inv.Items, item)
+				}
+
+				csvData, err := generateInvoiceCSV(inv)
+				if err != nil {
+					log.Printf("csv generation error: %v", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate CSV"})
+					return
+				}
+
+				c.Header("Content-Type", "text/csv")
+				c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=invoice-%s.csv", id[:8]))
+				c.Data(http.StatusOK, "text/csv", csvData)
+			})
+		}
+
+		r.Run(":8080")
 }

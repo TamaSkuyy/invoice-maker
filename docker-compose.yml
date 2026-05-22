@@ -21,6 +21,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: dev
     container_name: invoice-backend
     ports:
       - "8080:8080"
@@ -30,10 +31,14 @@ services:
       DB_USER: invoiceuser
       DB_PASSWORD: invoicepassword
       DB_NAME: invoicedb
+      JWT_SECRET: your-secret-key-change-in-production-min-32-chars
+      JWT_EXPIRATION: 86400
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    volumes:
+      - ./backend:/app
 
   frontend:
     build:

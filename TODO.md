@@ -8,12 +8,12 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### Database Integration
 
-- [ ] Replace in-memory storage with PostgreSQL database
+- [x] Replace in-memory storage with PostgreSQL database
   - Create database schema for invoices and items tables
   - Setup SQL migrations (use golang-migrate or sqlc)
   - Add connection pooling with pgx driver
-- [ ] Implement proper error handling for database operations
-- [ ] Add database transaction support (important for data consistency)
+- [x] Implement proper error handling for database operations
+- [x] Add database transaction support (important for data consistency)
 
 ### Learning Goal
 
@@ -27,7 +27,7 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### Authentication
 
-- [ ] Implement user registration/login system
+- [x] Implement user registration/login system
   - Password hashing (bcrypt)
   - JWT token-based authentication
   - Refresh token mechanism
@@ -38,16 +38,16 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### Database
 
-- [ ] Create users table with proper schema
-- [ ] Add user_id foreign key to invoices table
+- [x] Create users table with proper schema
+- [x] Add user_id foreign key to invoices table
 - [ ] Implement session management (optional with Redis)
 
 ### Frontend
 
-- [ ] Login/Register pages
-- [ ] Auth context/provider for React
-- [ ] Protected routes (redirect to login if not authenticated)
-- [ ] User profile dropdown menu
+- [x] Login/Register pages
+- [x] Auth context/provider for React
+- [x] Protected routes (redirect to login if not authenticated)
+- [x] User profile dropdown menu
 
 ### Learning Goal
 
@@ -61,25 +61,26 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### PDF Export
 
-- [ ] Generate PDF invoices from invoice data
-  - Use library: `github.com/phpdave11/gofpdf` (Go) or similar
-  - Include watermark/footer
-  - CSS styling in PDF
-- [ ] Download PDF from UI button
+- [x] Generate PDF invoices from invoice data
+  - Use library: `github.com/go-pdf/fpdf` (maintained fork of gofpdf)
+  - Include watermark ("INVOICE") and footer ("Thank you for your business!")
+  - Blue-themed professional layout matching frontend InvoicePreview
+- [x] Download PDF from UI button
 - [ ] Email PDF as attachment (optional)
 
 ### Excel/CSV Export
 
-- [ ] Export invoice list to Excel format
+- [x] Export invoice list to Excel format
   - Use `github.com/xuri/excelize` (Go)
-  - Multi-sheet support (invoices list, summary)
-- [ ] Export single invoice details to CSV
+  - Formatted headers, money columns, auto-filter
+- [x] Export single invoice details to CSV
 
 ### Frontend
 
-- [ ] Add "Download as PDF" button in preview
-- [ ] Add "Export Invoices" button in list view
-- [ ] Show download progress indicator
+- [x] Add "Download PDF" button in preview panel + each saved invoice row
+- [x] Add "Export to Excel" button in saved invoices list
+- [x] Add "CSV" download button in preview panel
+- [x] Loading/disabled state on export buttons (exporting indicator)
 
 ### Learning Goal
 

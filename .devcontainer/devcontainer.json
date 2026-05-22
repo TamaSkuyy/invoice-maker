@@ -1,0 +1,54 @@
+{
+  "name": "Invoice Maker Development",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "backend",
+  "runServices": ["backend", "postgres"],
+  "shutdownAction": "stopCompose",
+  "workspaceFolder": "/app",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-vscode.go",
+        "ms-vscode-remote.remote-containers",
+        "esbenp.prettier-vscode",
+        "ms-rest-client.rest-client"
+      ],
+      "settings": {
+        "go.useLanguageServer": true,
+        "go.lintOnSave": "package",
+        "go.lintTool": "golangci-lint",
+        "go.lintArgs": ["--fast"],
+        "editor.formatOnSave": true,
+        "[go]": {
+          "editor.defaultFormatter": "golang.go"
+        }
+      }
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  "forwardPorts": [8080, 5432],
+  "portsAttributes": {
+    "8080": {
+      "label": "Backend API",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "notify"
+    }
+  },
+  "remoteEnv": {
+    "DB_HOST": "postgres",
+    "DB_PORT": "5432",
+    "DB_USER": "invoiceuser",
+    "DB_PASSWORD": "invoicepassword",
+    "DB_NAME": "invoicedb",
+    "JWT_SECRET": "your-secret-key-change-in-production-min-32-chars",
+    "JWT_EXPIRATION": "900"
+  },
+  "postCreateCommand": "go mod download && go install github.com/air-verse/air@latest",
+  "remoteUser": "root"
+}
