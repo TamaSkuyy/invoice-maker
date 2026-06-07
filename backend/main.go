@@ -31,6 +31,7 @@ type InvoiceItem struct {
 type Invoice struct {
 	ID          string        `json:"id"`
 	ClientName  string        `json:"client_name"`
+	ClientID    *string       `json:"client_id"`
 	Date        string        `json:"date"`
 	Items       []InvoiceItem `json:"items"`
 	TaxRate     float64       `json:"tax_rate"`
@@ -71,6 +72,29 @@ type CustomClaims struct {
 	UserID string `json:"user_id"`
 	Email  string `json:"email"`
 	jwt.RegisteredClaims
+}
+
+// Client represents a saved client/customer.
+type Client struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Name      string    `json:"name"`
+	Email     string    `json:"email"`
+	Phone     string    `json:"phone"`
+	Address   string    `json:"address"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Product represents a saved product/service item.
+type Product struct {
+	ID           string    `json:"id"`
+	UserID       string    `json:"user_id"`
+	Name         string    `json:"name"`
+	Description  string    `json:"description"`
+	DefaultPrice float64   `json:"default_price"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // round2 rounds a float to 2 decimal places.
@@ -367,7 +391,7 @@ func main() {
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 			defer cancel()
 
-			rows, err := db.Query(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE user_id = $1 ORDER BY created_at DESC", userID)
+			rows, err := db.Query(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE user_id = $1 ORDER BY created_at DESC", userID)
 			if err != nil {
 				log.Printf("query error: %v", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch invoices"})
@@ -378,7 +402,7 @@ func main() {
 			var invoices []Invoice
 			for rows.Next() {
 				var inv Invoice
-				if err := rows.Scan(&inv.ID, &inv.ClientName, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt); err != nil {
+				if err := rows.Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt); err != nil {
 					log.Printf("scan error: %v", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse invoices"})
 					return
@@ -422,7 +446,7 @@ func main() {
 				ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 				defer cancel()
 
-				rows, err := db.Query(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE user_id = $1 ORDER BY created_at DESC", userID)
+				rows, err := db.Query(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE user_id = $1 ORDER BY created_at DESC", userID)
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch invoices"})
 					return
@@ -432,7 +456,7 @@ func main() {
 				var invoices []Invoice
 				for rows.Next() {
 					var inv Invoice
-					if err := rows.Scan(&inv.ID, &inv.ClientName, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt); err != nil {
+					if err := rows.Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt); err != nil {
 						c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse invoices"})
 						return
 					}
@@ -466,8 +490,8 @@ func main() {
 			defer cancel()
 
 			var inv Invoice
-			err := db.QueryRow(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
-				Scan(&inv.ID, &inv.ClientName, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
+			err := db.QueryRow(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
+				Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
 			if err != nil {
 				c.JSON(http.StatusNotFound, gin.H{"error": "invoice not found"})
 				return
@@ -529,8 +553,8 @@ func main() {
 
 			// Insert invoice
 			_, err = tx.Exec(ctx,
-				"INSERT INTO invoices (id, client_name, date, tax_rate, total_amount, user_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-				input.ID, input.ClientName, input.Date, input.TaxRate, input.TotalAmount, input.UserID, input.CreatedAt, input.UpdatedAt,
+				"INSERT INTO invoices (id, client_name, client_id, date, tax_rate, total_amount, user_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+				input.ID, input.ClientName, input.ClientID, input.Date, input.TaxRate, input.TotalAmount, input.UserID, input.CreatedAt, input.UpdatedAt,
 			)
 			if err != nil {
 				log.Printf("insert invoice error: %v", err)
@@ -637,7 +661,7 @@ func main() {
 
 			// Fetch and return updated invoice
 			var updatedInv Invoice
-			err = db.QueryRow(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1", id).
+			err = db.QueryRow(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1", id).
 				Scan(&updatedInv.ID, &updatedInv.ClientName, &updatedInv.Date, &updatedInv.TaxRate, &updatedInv.TotalAmount, &updatedInv.UserID, &updatedInv.CreatedAt, &updatedInv.UpdatedAt)
 			if err != nil {
 				log.Printf("fetch updated invoice error: %v", err)
@@ -703,8 +727,8 @@ func main() {
 				defer cancel()
 
 				var inv Invoice
-				err := db.QueryRow(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
-					Scan(&inv.ID, &inv.ClientName, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
+				err := db.QueryRow(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
+					Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
 				if err != nil {
 					c.JSON(http.StatusNotFound, gin.H{"error": "invoice not found"})
 					return
@@ -746,8 +770,8 @@ func main() {
 				defer cancel()
 
 				var inv Invoice
-				err := db.QueryRow(ctx, "SELECT id, client_name, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
-					Scan(&inv.ID, &inv.ClientName, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
+				err := db.QueryRow(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
+					Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
 				if err != nil {
 					c.JSON(http.StatusNotFound, gin.H{"error": "invoice not found"})
 					return
@@ -779,6 +803,244 @@ func main() {
 				c.Header("Content-Type", "text/csv")
 				c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=invoice-%s.csv", id[:8]))
 				c.Data(http.StatusOK, "text/csv", csvData)
+			})
+		}
+
+		// Client management routes (protected)
+		clients := r.Group("/api/clients")
+		clients.Use(authenticate())
+		{
+			clients.GET("", func(c *gin.Context) {
+				userID, _ := c.Get("user_id")
+				ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+				defer cancel()
+
+				rows, err := db.Query(ctx, "SELECT id, user_id, name, email, phone, address, created_at, updated_at FROM clients WHERE user_id = $1 ORDER BY name", userID)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch clients"})
+					return
+				}
+				defer rows.Close()
+
+				var clients []Client
+				for rows.Next() {
+					var cl Client
+					if err := rows.Scan(&cl.ID, &cl.UserID, &cl.Name, &cl.Email, &cl.Phone, &cl.Address, &cl.CreatedAt, &cl.UpdatedAt); err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse clients"})
+						return
+					}
+					clients = append(clients, cl)
+				}
+				if clients == nil {
+					clients = []Client{}
+				}
+				c.JSON(http.StatusOK, clients)
+			})
+
+			clients.POST("", func(c *gin.Context) {
+				var input Client
+				if err := c.ShouldBindJSON(&input); err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+					return
+				}
+				userID, _ := c.Get("user_id")
+
+				input.ID = uuid.New().String()
+				input.UserID = userID.(string)
+				now := time.Now()
+				input.CreatedAt = now
+				input.UpdatedAt = now
+
+				ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+				defer cancel()
+
+				_, err := db.Exec(ctx,
+					"INSERT INTO clients (id, user_id, name, email, phone, address, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+					input.ID, input.UserID, input.Name, input.Email, input.Phone, input.Address, input.CreatedAt, input.UpdatedAt,
+				)
+				if err != nil {
+					log.Printf("insert client error: %v", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create client"})
+					return
+				}
+				c.JSON(http.StatusCreated, input)
+			})
+
+			clients.PUT("/:id", func(c *gin.Context) {
+				id := c.Param("id")
+				userID, _ := c.Get("user_id")
+				var input Client
+				if err := c.ShouldBindJSON(&input); err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+					return
+				}
+
+				ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+				defer cancel()
+
+				var exists bool
+				err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM clients WHERE id = $1 AND user_id = $2)", id, userID).Scan(&exists)
+				if err != nil || !exists {
+					c.JSON(http.StatusNotFound, gin.H{"error": "client not found"})
+					return
+				}
+
+				now := time.Now()
+				_, err = db.Exec(ctx,
+					"UPDATE clients SET name = $1, email = $2, phone = $3, address = $4, updated_at = $5 WHERE id = $6 AND user_id = $7",
+					input.Name, input.Email, input.Phone, input.Address, now, id, userID,
+				)
+				if err != nil {
+					log.Printf("update client error: %v", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update client"})
+					return
+				}
+
+				var updated Client
+				db.QueryRow(ctx, "SELECT id, user_id, name, email, phone, address, created_at, updated_at FROM clients WHERE id = $1", id).
+					Scan(&updated.ID, &updated.UserID, &updated.Name, &updated.Email, &updated.Phone, &updated.Address, &updated.CreatedAt, &updated.UpdatedAt)
+				c.JSON(http.StatusOK, updated)
+			})
+
+			clients.DELETE("/:id", func(c *gin.Context) {
+				id := c.Param("id")
+				userID, _ := c.Get("user_id")
+				ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+				defer cancel()
+
+				var exists bool
+				err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM clients WHERE id = $1 AND user_id = $2)", id, userID).Scan(&exists)
+				if err != nil || !exists {
+					c.JSON(http.StatusNotFound, gin.H{"error": "client not found"})
+					return
+				}
+
+				_, err = db.Exec(ctx, "DELETE FROM clients WHERE id = $1", id)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete client"})
+					return
+				}
+
+				c.JSON(http.StatusOK, gin.H{"message": "client deleted"})
+			})
+		}
+
+		// Product management routes (protected)
+		products := r.Group("/api/products")
+		products.Use(authenticate())
+		{
+			products.GET("", func(c *gin.Context) {
+				userID, _ := c.Get("user_id")
+				ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+				defer cancel()
+
+				rows, err := db.Query(ctx, "SELECT id, user_id, name, description, default_price, created_at, updated_at FROM products WHERE user_id = $1 ORDER BY name", userID)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch products"})
+					return
+				}
+				defer rows.Close()
+
+				var products []Product
+				for rows.Next() {
+					var p Product
+					if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.Description, &p.DefaultPrice, &p.CreatedAt, &p.UpdatedAt); err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse products"})
+						return
+					}
+					products = append(products, p)
+				}
+				if products == nil {
+					products = []Product{}
+				}
+				c.JSON(http.StatusOK, products)
+			})
+
+			products.POST("", func(c *gin.Context) {
+				var input Product
+				if err := c.ShouldBindJSON(&input); err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+					return
+				}
+				userID, _ := c.Get("user_id")
+
+				input.ID = uuid.New().String()
+				input.UserID = userID.(string)
+				now := time.Now()
+				input.CreatedAt = now
+				input.UpdatedAt = now
+
+				ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+				defer cancel()
+
+				_, err := db.Exec(ctx,
+					"INSERT INTO products (id, user_id, name, description, default_price, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+					input.ID, input.UserID, input.Name, input.Description, input.DefaultPrice, input.CreatedAt, input.UpdatedAt,
+				)
+				if err != nil {
+					log.Printf("insert product error: %v", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create product"})
+					return
+				}
+				c.JSON(http.StatusCreated, input)
+			})
+
+			products.PUT("/:id", func(c *gin.Context) {
+				id := c.Param("id")
+				userID, _ := c.Get("user_id")
+				var input Product
+				if err := c.ShouldBindJSON(&input); err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+					return
+				}
+
+				ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+				defer cancel()
+
+				var exists bool
+				err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM products WHERE id = $1 AND user_id = $2)", id, userID).Scan(&exists)
+				if err != nil || !exists {
+					c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
+					return
+				}
+
+				now := time.Now()
+				_, err = db.Exec(ctx,
+					"UPDATE products SET name = $1, description = $2, default_price = $3, updated_at = $4 WHERE id = $5 AND user_id = $6",
+					input.Name, input.Description, input.DefaultPrice, now, id, userID,
+				)
+				if err != nil {
+					log.Printf("update product error: %v", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update product"})
+					return
+				}
+
+				var updated Product
+				db.QueryRow(ctx, "SELECT id, user_id, name, description, default_price, created_at, updated_at FROM products WHERE id = $1", id).
+					Scan(&updated.ID, &updated.UserID, &updated.Name, &updated.Description, &updated.DefaultPrice, &updated.CreatedAt, &updated.UpdatedAt)
+				c.JSON(http.StatusOK, updated)
+			})
+
+			products.DELETE("/:id", func(c *gin.Context) {
+				id := c.Param("id")
+				userID, _ := c.Get("user_id")
+				ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+				defer cancel()
+
+				var exists bool
+				err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM products WHERE id = $1 AND user_id = $2)", id, userID).Scan(&exists)
+				if err != nil || !exists {
+					c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
+					return
+				}
+
+				_, err = db.Exec(ctx, "DELETE FROM products WHERE id = $1", id)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete product"})
+					return
+				}
+
+				c.JSON(http.StatusOK, gin.H{"message": "product deleted"})
 			})
 		}
 

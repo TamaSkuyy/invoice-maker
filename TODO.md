@@ -94,29 +94,29 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### Invoice Templates
 
-- [ ] Add multiple invoice templates (professional, minimal, detailed)
-- [ ] Store template preferences in user profile
-- [ ] Customize colors, fonts, logo upload
+- [-] Add multiple invoice templates (professional, minimal, detailed) — _skipped: low ROI_
+- [-] Store template preferences in user profile — _skipped: low ROI_
+- [-] Customize colors, fonts, logo upload — _skipped: low ROI_
 
 ### Client Management
 
-- [ ] Create separate clients database table
-- [ ] Client list with CRUD operations
-- [ ] Auto-fill client info when selecting from list
+- [x] Create separate clients database table
+- [x] Client list with CRUD operations
+- [x] Auto-fill client info when selecting from list
 - [ ] Save client payment methods (optional)
 
 ### Invoice Line Items & Products
 
-- [ ] Create products table for frequently used items
-- [ ] Quick-select products when adding invoice items
-- [ ] Product price defaults & variations
+- [x] Create products table for frequently used items
+- [x] Quick-select products when adding invoice items
+- [x] Product price defaults & variations
 
 ### Tax & Currency
 
-- [ ] Support multiple currencies (USD, EUR, IDR, etc.)
-- [ ] Different tax rates per item
-- [ ] Sales tax vs service tax differentiation
-- [ ] Multi-country tax rules
+- [-] Support multiple currencies (USD, EUR, IDR, etc.) — _skipped: IDR + flat rate cukup_
+- [-] Different tax rates per item — _skipped: IDR + flat rate cukup_
+- [-] Sales tax vs service tax differentiation — _skipped: IDR + flat rate cukup_
+- [-] Multi-country tax rules — _skipped: IDR + flat rate cukup_
 
 ### Learning Goal
 

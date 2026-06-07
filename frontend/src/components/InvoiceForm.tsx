@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
 import { apiFetch } from "../utils/api";
 import type { Invoice, InvoiceItem } from "../types/invoice";
+import ClientSelector from "./ClientSelector";
+import ProductSelector from "./ProductSelector";
 
 const EMPTY_ITEM: InvoiceItem = { description: "", qty: 1, price: 0 };
 
@@ -11,6 +13,7 @@ interface Props {
 export default function InvoiceForm({ onSaved }: Props) {
   const today = new Date().toISOString().split("T")[0];
   const [clientName, setClientName] = useState("");
+  const [clientId, setClientId] = useState<string | null | undefined>(null);
   const [date, setDate] = useState(today);
   const [items, setItems] = useState<InvoiceItem[]>([{ ...EMPTY_ITEM }]);
   const [taxRate, setTaxRate] = useState(10);
@@ -49,6 +52,7 @@ export default function InvoiceForm({ onSaved }: Props) {
     }
     const payload: Invoice = {
       client_name: clientName,
+      client_id: clientId ?? null,
       date,
       items,
       tax_rate: taxRate,
@@ -61,6 +65,7 @@ export default function InvoiceForm({ onSaved }: Props) {
       });
       onSaved(saved);
       setClientName("");
+      setClientId(null);
       setDate(today);
       setItems([{ ...EMPTY_ITEM }]);
       setTaxRate(10);
@@ -83,19 +88,15 @@ export default function InvoiceForm({ onSaved }: Props) {
 
       {/* Client & Date */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <ClientSelector
+          value={clientName}
+          onChange={(name, id) => {
+            setClientName(name);
+            setClientId(id);
+          }}
+        />
         <div>
-          <label className="block text-sm font-medium text-gray-600">
-            Client Name
-          </label>
-          <input
-            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-            value={clientName}
-            onChange={(e) => setClientName(e.target.value)}
-            placeholder="Acme Corp"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-600">
+          <label className="block text-sm font-medium text-gray-600 mb-1">
             Date
           </label>
           <input
@@ -127,14 +128,22 @@ export default function InvoiceForm({ onSaved }: Props) {
               {items.map((item, idx) => (
                 <tr key={idx} className="border-b border-gray-100">
                   <td className="px-3 py-1">
-                    <input
-                      className="w-full rounded border border-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-300"
-                      value={item.description}
-                      onChange={(e) =>
-                        updateItem(idx, "description", e.target.value)
-                      }
-                      placeholder="Service / Product"
-                    />
+                    <div className="flex items-center gap-1">
+                      <input
+                        className="flex-1 rounded border border-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                        value={item.description}
+                        onChange={(e) =>
+                          updateItem(idx, "description", e.target.value)
+                        }
+                        placeholder="Service / Product"
+                      />
+                      <ProductSelector
+                        onPick={(desc, price) => {
+                          updateItem(idx, "description", desc);
+                          updateItem(idx, "price", price);
+                        }}
+                      />
+                    </div>
                   </td>
                   <td className="px-3 py-1">
                     <input
