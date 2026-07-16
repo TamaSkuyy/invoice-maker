@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRound2(t *testing.T) {
@@ -74,4 +75,26 @@ func TestCalculateTotal(t *testing.T) {
 			assert.Equal(t, tt.want, calculateTotal(tt.items, tt.taxRate))
 		})
 	}
+}
+
+func TestHashPassword(t *testing.T) {
+	hash, err := hashPassword("secret_password")
+	require.NoError(t, err)
+	assert.NotEmpty(t, hash)
+	assert.NotEqual(t, "secret_password", hash)
+
+	// bcrypt salts each hash, so hashing the same password twice
+	// must produce two different hashes.
+	hash2, err := hashPassword("secret_password")
+	require.NoError(t, err)
+	assert.NotEqual(t, hash, hash2)
+}
+
+func TestVerifyHashPassword(t *testing.T) {
+	hash, err := hashPassword("correct_password")
+	require.NoError(t, err)
+
+	assert.True(t, verifyPassword(hash, "correct_password"))
+	assert.False(t, verifyPassword(hash, "incorrect_password"))
+	assert.False(t, verifyPassword(hash, ""))
 }
