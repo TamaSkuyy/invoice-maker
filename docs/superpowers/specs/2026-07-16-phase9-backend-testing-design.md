@@ -56,12 +56,15 @@ Semua kecuali `/api/auth/register` dan `/api/auth/login` dilindungi `authenticat
 
 **File baru**: `backend/router.go`
 
-Pindahkan seluruh isi `main()` dari `r := gin.Default()` sampai sebelum `r.Run()` ke:
+**Koreksi penting dari asumsi awal**: Handler di `main.go` (auth, invoices, clients, products) adalah closure yang reference package-level `var db *pgxpool.Pool` langsung. Tapi handler `analytics.go` (`handleAnalyticsOverview`, dkk.) adalah **named function terpisah** yang juga reference `db` package-level — bukan closure di dalam `main()`. Kalau `setupRouter` dikasih parameter `db *pgxpool.Pool`, parameter itu cuma akan di-capture oleh closure yang secara lexical ditulis di dalam `setupRouter` (auth/invoices/clients/products) — sedangkan `handleAnalyticsOverview` dkk. tetap pakai `db` package-level asli karena mereka fungsi top-level yang independen.
+
+Daripada bikin dua sumber `db` yang beda (parameter lokal untuk sebagian handler, var global untuk sisanya) — pendekatan yang lebih konsisten dan sesuai pola yang sudah ada di codebase (`db` package-level dipakai di semua tempat) adalah: **`setupRouter()` tidak menerima parameter sama sekali**, cukup pakai `db` package-level yang harus sudah di-assign sebelum dipanggil.
 
 ```go
-func setupRouter(db *pgxpool.Pool) *gin.Engine {
+func setupRouter() *gin.Engine {
     r := gin.Default()
-    // ... semua r.Use(), r.Group(), handler registration — persis seperti sekarang
+    // ... semua r.Use(), r.Group(), handler registration — persis seperti sekarang,
+    // tetap reference `db` package-level, sama seperti analytics.go
     return r
 }
 ```
@@ -79,14 +82,12 @@ func main() {
         log.Fatalf("failed to run migrations: %v", err)
     }
 
-    r := setupRouter(db)
+    r := setupRouter()
     r.Run(":8080")
 }
 ```
 
-**Penting**: Handler yang sekarang closure (pakai package-level var `db` langsung) **tidak dibongkar** jadi named function. Mereka tetap closure, tapi closure itu ditulis di dalam `setupRouter(db *pgxpool.Pool)` sehingga menangkap parameter `db` lokal — bukan package-level var. Ini memungkinkan test memanggil `setupRouter(testDB)` dengan pool database test yang terisolasi, tanpa perlu refactor 800 baris handler jadi named functions (itu di luar scope Phase 9).
-
-Package-level `var db *pgxpool.Pool` di `db.go` tetap ada (dipakai `main()` dan `runMigrations()`), tapi handler di dalam `setupRouter()` pakai parameter `db`, bukan var global.
+Test (`TestMain`) meng-assign `db = testDB` (reassign var package-level yang sama, legal karena test file ada di package yang sama) sebelum memanggil `setupRouter()`. Ini konsisten dengan pola global-db-pool yang sudah dipakai di seluruh codebase (termasuk `analytics.go`), tidak butuh refactor 800 baris handler jadi named function/dependency injection (itu improvement terpisah, di luar scope Phase 9), dan tidak menciptakan dua sumber kebenaran untuk `db`.
 
 ---
 
@@ -97,8 +98,6 @@ Package-level `var db *pgxpool.Pool` di `db.go` tetap ada (dipakai `main()` dan 
 **File**: `backend/main_test.go`
 
 ```go
-var testDB *pgxpool.Pool
-
 func TestMain(m *testing.M) {
     ctx := context.Background()
 
@@ -115,8 +114,14 @@ func TestMain(m *testing.M) {
     }
     defer container.Terminate(ctx)
 
-    connStr, _ := container.ConnectionString(ctx, "sslmode=disable")
-    testDB, err = pgxpool.New(ctx, connStr)
+    connStr, err := container.ConnectionString(ctx, "sslmode=disable")
+    if err != nil {
+        log.Fatalf("failed to get connection string: %v", err)
+    }
+
+    // Assign the package-level `db` var (declared in db.go) — every handler,
+    // closure or named function, reads from this same var.
+    db, err = pgxpool.New(ctx, connStr)
     if err != nil {
         log.Fatalf("failed to connect to test db: %v", err)
     }
