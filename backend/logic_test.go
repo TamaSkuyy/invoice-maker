@@ -98,3 +98,39 @@ func TestVerifyHashPassword(t *testing.T) {
 	assert.False(t, verifyPassword(hash, "incorrect_password"))
 	assert.False(t, verifyPassword(hash, ""))
 }
+
+func TestGenerateAndValidateJWT(t *testing.T) {
+	t.Run("valid token round-trips claims", func(t *testing.T) {
+		token, err := generateJWT("sekuyy", "sekuyy@mail.com")
+		require.NoError(t, err)
+		assert.NotEmpty(t, token)
+
+		claims, err := validateJWT(token)
+		require.NoError(t, err)
+		assert.Equal(t, "sekuyy",  claims.UserID)
+		assert.Equal(t, "sekuyy@mail.com", claims.Email)
+	})
+
+	t.Run("malformed token is rejected", func(t *testing.T) {
+		_, err := validateJWT("not_real_token")
+		assert.Error(t, err)
+	})
+
+	t.Run("tampered token is rejected", func(t *testing.T) {
+		token, err := generateJWT("sekuyy", "sekuyy@mail.com")
+		require.NoError(t, err)
+
+		tampered := token[:len(token)-2] + "xx"
+		_, err = validateJWT(tampered)
+		assert.Error(t, err)
+	})
+
+	t.Run("expired token is rejected", func(t *testing.T) {
+		t.Setenv("JWT_EXPIRATION", "-1")
+		token, err := generateJWT("sekuyy", "sekuyy@mail.com")
+		require.NoError(t, err)
+
+		_, err = validateJWT(token)
+		assert.Error(t, err)
+	})
+}
