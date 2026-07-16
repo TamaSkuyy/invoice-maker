@@ -1044,5 +1044,16 @@ func main() {
 			})
 		}
 
+		// Analytics routes (protected)
+		analytics := r.Group("/api/analytics")
+		analytics.Use(authenticate())
+		{
+			analytics.GET("/overview", handleAnalyticsOverview)
+			analytics.GET("/revenue", handleAnalyticsRevenue)
+			analytics.GET("/top-clients", handleAnalyticsTopClients)
+			analytics.GET("/tax-summary", handleAnalyticsTaxSummary)
+			analytics.GET("/report", handleAnalyticsReport)
+		}
+
 		r.Run(":8080")
 }

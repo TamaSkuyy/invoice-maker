@@ -1,26 +1,48 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Navbar } from "./Navbar";
 import InvoiceForm from "./InvoiceForm";
 import InvoicePreview from "./InvoicePreview";
+import { DashboardCards } from "./DashboardCards";
+import { RevenueChart } from "./RevenueChart";
+import { TopClientsChart } from "./TopClientsChart";
+import { TaxSummaryCard } from "./TaxSummaryCard";
 import { apiFetch } from "../utils/api";
 import { downloadFile } from "../utils/export";
 import { User } from "../types/auth";
 import type { Invoice } from "../types/invoice";
+import type {
+  AnalyticsOverview,
+  RevenueDataPoint,
+  TopClientData,
+  TaxDataPoint,
+} from "../types/analytics";
 
 interface ProtectedInvoiceDashboardProps {
   user: User | null;
   onLogout: () => void;
 }
 
+const currentYear = new Date().getFullYear();
+
 export function ProtectedInvoiceDashboard({
   user,
   onLogout,
 }: ProtectedInvoiceDashboardProps) {
+  // Legacy state
   const [savedInvoices, setSavedInvoices] = useState<Invoice[]>([]);
   const [preview, setPreview] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<string | null>(null);
 
+  // Analytics state
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
+  const [revenue, setRevenue] = useState<RevenueDataPoint[]>([]);
+  const [topClients, setTopClients] = useState<TopClientData[]>([]);
+  const [taxSummary, setTaxSummary] = useState<TaxDataPoint[]>([]);
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+
+  // Fetch saved invoices
   useEffect(() => {
     const fetchInvoices = async () => {
       try {
@@ -32,9 +54,33 @@ export function ProtectedInvoiceDashboard({
         setLoading(false);
       }
     };
-
     fetchInvoices();
   }, []);
+
+  // Fetch analytics data
+  const fetchAnalytics = useCallback(async (year: number) => {
+    setAnalyticsLoading(true);
+    try {
+      const [ov, revResp, tcResp, taxResp] = await Promise.all([
+        apiFetch<AnalyticsOverview>("/analytics/overview"),
+        apiFetch<{ data: RevenueDataPoint[] }>(`/analytics/revenue?year=${year}`),
+        apiFetch<{ clients: TopClientData[] }>("/analytics/top-clients?limit=5"),
+        apiFetch<{ data: TaxDataPoint[] }>(`/analytics/tax-summary?year=${year}`),
+      ]);
+      setOverview(ov);
+      setRevenue(revResp.data || []);
+      setTopClients(tcResp.clients || []);
+      setTaxSummary(taxResp.data || []);
+    } catch (err) {
+      console.error("Failed to fetch analytics:", err);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAnalytics(selectedYear);
+  }, [fetchAnalytics, selectedYear]);
 
   const handleSaved = (invoice: Invoice) => {
     setSavedInvoices((prev) => [invoice, ...prev]);
@@ -56,13 +102,32 @@ export function ProtectedInvoiceDashboard({
     <>
       <Navbar user={user} onLogout={onLogout} />
       <main className="max-w-6xl mx-auto px-4 py-8">
+
+        {/* ── Dashboard Section ─────────────────────────────────── */}
+        <section className="mb-10">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Dashboard</h2>
+
+          <DashboardCards data={overview} loading={analyticsLoading} />
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <RevenueChart
+              data={revenue}
+              loading={analyticsLoading}
+              year={selectedYear}
+              onYearChange={setSelectedYear}
+            />
+            <TopClientsChart data={topClients} loading={analyticsLoading} />
+          </div>
+
+          <TaxSummaryCard data={taxSummary} loading={analyticsLoading} year={selectedYear} />
+        </section>
+
+        {/* ── Invoice Section ───────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          {/* Form Panel */}
           <section className="bg-white rounded-xl shadow p-6">
             <InvoiceForm onSaved={handleSaved} />
           </section>
 
-          {/* Preview Panel */}
           <section>
             {preview ? (
               <div className="space-y-4">
@@ -103,7 +168,7 @@ export function ProtectedInvoiceDashboard({
           </section>
         </div>
 
-        {/* Saved Invoices List */}
+        {/* ── Saved Invoices ────────────────────────────────────── */}
         {!loading && savedInvoices.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-4">
@@ -143,7 +208,7 @@ export function ProtectedInvoiceDashboard({
                       </td>
                       <td className="px-4 py-3 text-gray-500">{inv.date}</td>
                       <td className="px-4 py-3 text-right font-mono font-semibold text-blue-600">
-                        ${(inv.total_amount ?? 0).toFixed(2)}
+                        Rp {(inv.total_amount ?? 0).toFixed(2)}
                       </td>
                       <td className="px-4 py-3 text-right space-x-2">
                         <button

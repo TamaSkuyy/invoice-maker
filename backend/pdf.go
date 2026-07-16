@@ -198,5 +198,5 @@ func formatMoney(v float64) string {
 	if n > 3 {
 		intPart = intPart[:n-3] + "," + intPart[n-3:]
 	}
-	return "$" + intPart + "." + decPart
+	return "Rp " + intPart + "." + decPart
 }

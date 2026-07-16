@@ -25,8 +25,9 @@ func generateInvoicesExcel(invoices []Invoice) ([]byte, error) {
 		},
 	})
 
+	moneyFmt := "\"Rp \"#,##0.00"
 	moneyStyle, _ := f.NewStyle(&excelize.Style{
-		NumFmt:    36, // $#,##0.00
+		CustomNumFmt: &moneyFmt,
 		Alignment: &excelize.Alignment{Horizontal: "right"},
 	})
 

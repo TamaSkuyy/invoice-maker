@@ -173,7 +173,7 @@ export default function InvoiceForm({ onSaved }: Props) {
                     />
                   </td>
                   <td className="px-3 py-1 text-right font-mono">
-                    ${(item.qty * item.price).toFixed(2)}
+                    Rp {(item.qty * item.price).toFixed(2)}
                   </td>
                   <td className="px-3 py-1 text-center">
                     {items.length > 1 && (
@@ -204,7 +204,7 @@ export default function InvoiceForm({ onSaved }: Props) {
         <div className="w-64 space-y-1 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-500">Subtotal</span>
-            <span className="font-mono">${subtotal.toFixed(2)}</span>
+            <span className="font-mono">Rp {subtotal.toFixed(2)}</span>
           </div>
           <div className="flex items-center justify-between">
             <label className="text-gray-500">
@@ -220,12 +220,12 @@ export default function InvoiceForm({ onSaved }: Props) {
               />
               %
             </label>
-            <span className="font-mono">${taxAmount.toFixed(2)}</span>
+            <span className="font-mono">Rp {taxAmount.toFixed(2)}</span>
           </div>
           <div className="flex justify-between border-t border-gray-200 pt-1 font-semibold">
             <span>Grand Total</span>
             <span className="font-mono text-blue-600">
-              ${grandTotal.toFixed(2)}
+              Rp {grandTotal.toFixed(2)}
             </span>
           </div>
         </div>

@@ -1,0 +1,44 @@
+<h2>Where should the Dashboard live?</h2>
+<p class="subtitle">Current app is a single-page invoice form + list. Phase 5 adds analytics.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Top Section + Scroll</h3>
+      <p>Dashboard cards + charts di atas halaman utama (di atas form invoice). User scroll ke bawah untuk bikin invoice. Semua dalam satu halaman — no navigation needed.</p>
+      <div class="mockup" style="margin-top:1rem">
+        <div class="mockup-header">Layout: Single Page, Dashboard on Top</div>
+        <div class="mockup-body">
+          <div class="placeholder" style="height:60px;margin-bottom:8px">📊 Dashboard Cards (Total Revenue, Invoice Count, Top Client)</div>
+          <div class="placeholder" style="height:100px;margin-bottom:8px">📈 Revenue Chart (Monthly)</div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <div class="placeholder" style="flex:1;height:80px">🥧 Top Clients</div>
+            <div class="placeholder" style="flex:1;height:80px">📋 Tax Summary</div>
+          </div>
+          <div class="placeholder" style="height:200px">📝 Invoice Form (existing)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Tab Navigation</h3>
+      <p>Dashboard jadi tab terpisah. Navbar punya 2 tab: "Dashboard" (analytics) dan "Invoices" (form + list yang sudah ada). Lebih clean, fokus per halaman.</p>
+      <div class="mockup" style="margin-top:1rem">
+        <div class="mockup-header">Layout: Tabs — Dashboard | Invoices</div>
+        <div class="mockup-body">
+          <div class="mock-nav" style="margin-bottom:8px">🏷️ [Dashboard] &nbsp; [Invoices]</div>
+          <div class="placeholder" style="height:60px;margin-bottom:8px">📊 Dashboard Cards</div>
+          <div class="placeholder" style="height:100px;margin-bottom:8px">📈 Revenue Chart</div>
+          <div style="display:flex;gap:8px">
+            <div class="placeholder" style="flex:1;height:80px">🥧 Top Clients</div>
+            <div class="placeholder" style="flex:1;height:80px">📋 Tax Summary</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

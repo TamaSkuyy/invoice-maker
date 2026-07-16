@@ -224,6 +224,15 @@ cleanup() {
 
 trap cleanup INT TERM EXIT
 
+# ── Environment variables untuk backend (jalan di host, bukan container) ──
+export DB_HOST="${DB_HOST:-localhost}"
+export DB_PORT="${DB_PORT:-5432}"
+export DB_USER="${DB_USER:-invoiceuser}"
+export DB_PASSWORD="${DB_PASSWORD:-invoicepassword}"
+export DB_NAME="${DB_NAME:-invoicedb}"
+export JWT_SECRET="${JWT_SECRET:-dev-secret-key-do-not-use-in-production}"
+export JWT_EXPIRATION="${JWT_EXPIRATION:-86400}"
+
 # ── Start backend ─────────────────────────────────────────────────────────
 log "Starting Go backend on http://localhost:8080 ..."
 

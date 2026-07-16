@@ -57,10 +57,10 @@ export default function InvoicePreview({ invoice }: Props) {
               <td className="px-4 py-2">{item.description}</td>
               <td className="px-4 py-2 text-right font-mono">{item.qty}</td>
               <td className="px-4 py-2 text-right font-mono">
-                ${item.price.toFixed(2)}
+                Rp {item.price.toFixed(2)}
               </td>
               <td className="px-4 py-2 text-right font-mono">
-                ${(item.qty * item.price).toFixed(2)}
+                Rp {(item.qty * item.price).toFixed(2)}
               </td>
             </tr>
           ))}
@@ -72,15 +72,15 @@ export default function InvoicePreview({ invoice }: Props) {
         <div className="w-56 space-y-1 text-sm">
           <div className="flex justify-between text-gray-500">
             <span>Subtotal</span>
-            <span className="font-mono">${subtotal.toFixed(2)}</span>
+            <span className="font-mono">Rp {subtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-gray-500">
             <span>Tax ({invoice.tax_rate}%)</span>
-            <span className="font-mono">${taxAmount.toFixed(2)}</span>
+            <span className="font-mono">Rp {taxAmount.toFixed(2)}</span>
           </div>
           <div className="flex justify-between border-t border-gray-300 pt-2 font-bold text-base">
             <span>Total</span>
-            <span className="font-mono text-blue-600">${total.toFixed(2)}</span>
+            <span className="font-mono text-blue-600">Rp {total.toFixed(2)}</span>
           </div>
         </div>
       </div>

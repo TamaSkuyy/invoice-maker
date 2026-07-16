@@ -60,7 +60,7 @@ export default function ProductSelector({ onPick }: Props) {
                 {p.name}
               </span>
               <span className="text-gray-400 font-mono text-xs whitespace-nowrap">
-                ${p.default_price.toFixed(2)}
+                Rp {p.default_price.toFixed(2)}
               </span>
             </button>
           ))}
