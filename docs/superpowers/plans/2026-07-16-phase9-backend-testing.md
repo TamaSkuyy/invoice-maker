@@ -4,16 +4,16 @@
 >
 > **Exception for this plan**: the user (learning Go) writes the test code themselves task-by-task; Claude reviews and guides rather than writing it. Do not dispatch a subagent to write code for a task without the user's explicit go-ahead for that specific task.
 
-**Goal:** Add unit + integration tests to the Go backend (table-driven pure-function tests, `testcontainers-go`-backed HTTP integration tests) covering auth, invoices, clients, products, and analytics, so the repo is a credible Go portfolio piece.
+**Goal:** Add unit + integration tests to the Go backend (table-driven pure-function tests, HTTP integration tests against a real Postgres) covering auth, invoices, clients, products, and analytics, so the repo is a credible Go portfolio piece.
 
-**Architecture:** Extract routing from `main()` into a parameterless `setupRouter()` in a new `router.go`, so both `main()` and tests build the identical router. Tests reassign the existing package-level `db *pgxpool.Pool` var to a `testcontainers-go`-managed Postgres instance before calling `setupRouter()`. Pure-logic tests need neither the router nor a database.
+**Architecture:** Extract routing from `main()` into a parameterless `setupRouter()` in a new `router.go`, so both `main()` and tests build the identical router. Tests reassign the existing package-level `db *pgxpool.Pool` var to a dedicated `invoicedb_test` database (created fresh in the already-running dev Postgres instance) before calling `setupRouter()`. Pure-logic tests need neither the router nor a database. (Originally designed around `testcontainers-go`; revised 2026-07-17 — see Task 5's note and the spec's Section 2 for why.)
 
-**Tech Stack:** Go 1.25, `testing` (stdlib), `github.com/stretchr/testify` (assert/require), `github.com/testcontainers/testcontainers-go` + its `postgres` module, existing `gin`, `pgx/v5`, `golang-migrate`.
+**Tech Stack:** Go 1.25, `testing` (stdlib), `github.com/stretchr/testify` (assert/require), existing `gin`, `pgx/v5`, `golang-migrate`.
 
 ## Global Constraints
 
 - Go module: `github.com/TamaSkuyy/invoice-maker/backend`, Go 1.25 (from `go.mod`).
-- Test DB requires Docker/Podman running locally (same requirement as `dev-local.sh`).
+- Test DB requires the `invoice-postgres` container already running locally at `localhost:5432` (start it via `dev-local.sh` or `docker compose up postgres`) — `TestMain` connects to it and creates a dedicated `invoicedb_test` database, it does not spin up its own container.
 - No handler is converted from closure to named function as part of this plan — only relocated into `setupRouter()` verbatim.
 - Package-level `var db *pgxpool.Pool` (in `db.go`) remains the single source of truth for the DB connection in both prod and test code — do not introduce a second `db` variable or a parameter that shadows it.
 - All new test files use `testify`'s `assert`/`require`, not raw `if err != nil { t.Fatal(...) }`.
@@ -392,27 +392,24 @@ git commit -m "refactor: extract setupRouter() from main() for testability"
 
 ---
 
-### Task 5: Integration test infrastructure (`TestMain` + testcontainers) and auth handler tests
+### Task 5: Integration test infrastructure (`TestMain` + dedicated test DB) and auth handler tests
+
+> **Revisi 2026-07-17**: Desain awal task ini pakai `testcontainers-go` buat spin up Postgres container per test run. Itu gagal di environment lokal — Podman rootless (bukan dockerd asli) tidak kompatibel dengan cara testcontainers-go bikin container dinamis (port publishing butuh iptables DNAT, sementara Podman rootless pakai userspace networking). Lihat `docs/superpowers/specs/2026-07-16-phase9-backend-testing-design.md` Section 2 untuk detail lengkap. Task ini direvisi untuk pakai database terpisah (`invoicedb_test`) di Postgres dev yang sudah jalan, bukan container baru.
 
 **Files:**
 - Create: `backend/main_test.go`
 - Create: `backend/auth_test.go`
 - Modify: `backend/go.mod`, `backend/go.sum` (via `go get`)
 
+**Prasyarat runtime**: container `invoice-postgres` harus sudah jalan di `localhost:5432` (`./dev-local.sh` atau `docker compose up postgres`) sebelum `go test ./...` dijalankan.
+
 **Interfaces:**
 - Consumes: `setupRouter()` and `runMigrationsWithConn(connString string) error` (Task 4); package-level `db` (`backend/db.go`); `SignupRequest{Email, Password}`, `LoginRequest{Email, Password}`, `AuthResponse{Token string, User User}` (`backend/main.go:53-68`).
 - Produces: `truncateTables(t *testing.T)` helper — used by every later integration test file (Tasks 6-9). `registerTestUser(t *testing.T, router *gin.Engine, email, password string) string` helper returning a bearer token — used by Tasks 6-9 to authenticate requests.
 
-- [ ] **Step 1: Add testcontainers-go dependencies**
+- [ ] **Step 1: Add testify dependency (already present from Task 1) — no new deps needed for this task**
 
-Run:
-```bash
-cd backend
-go get github.com/testcontainers/testcontainers-go
-go get github.com/testcontainers/testcontainers-go/modules/postgres
-```
-
-Expected: `go.mod`/`go.sum` updated with both modules and their transitive deps.
+This task no longer requires new dependencies beyond `testify` (already added in Task 1). Skip straight to Step 2.
 
 - [ ] **Step 2: Write `backend/main_test.go` with `TestMain` and shared test helpers**
 
@@ -428,52 +425,50 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 func TestMain(m *testing.M) {
 	gin.SetMode(gin.TestMode)
 	ctx := context.Background()
 
-	container, err := postgres.Run(ctx, "postgres:16-alpine",
-		postgres.WithDatabase("invoice_test"),
-		postgres.WithUsername("test"),
-		postgres.WithPassword("test"),
-		testcontainers.WithWaitStrategy(
-			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).
-				WithStartupTimeout(60*time.Second),
-		),
-	)
+	adminConnStr := "postgres://invoiceuser:invoicepassword@localhost:5432/postgres?sslmode=disable"
+	adminPool, err := pgxpool.New(ctx, adminConnStr)
 	if err != nil {
-		log.Fatalf("failed to start postgres container: %v", err)
+		log.Fatalf("failed to connect to postgres admin db: %v", err)
 	}
 
-	connStr, err := container.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		log.Fatalf("failed to get connection string: %v", err)
+	// Terminate any lingering connections to the test db from a previous
+	// run so DROP DATABASE doesn't fail with "database is being accessed
+	// by other users".
+	_, _ = adminPool.Exec(ctx, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'invoicedb_test' AND pid <> pg_backend_pid()`)
+	if _, err := adminPool.Exec(ctx, `DROP DATABASE IF EXISTS invoicedb_test`); err != nil {
+		log.Fatalf("failed to drop test db: %v", err)
 	}
+	if _, err := adminPool.Exec(ctx, `CREATE DATABASE invoicedb_test`); err != nil {
+		log.Fatalf("failed to create test db: %v", err)
+	}
+	adminPool.Close()
 
-	db, err = pgxpool.New(ctx, connStr)
+	testConnStr := "postgres://invoiceuser:invoicepassword@localhost:5432/invoicedb_test?sslmode=disable"
+
+	// Assign the package-level `db` var (declared in db.go) — every handler,
+	// closure or named function, reads from this same var.
+	db, err = pgxpool.New(ctx, testConnStr)
 	if err != nil {
 		log.Fatalf("failed to connect to test db: %v", err)
 	}
 
-	if err := runMigrationsWithConn(connStr); err != nil {
+	if err := runMigrationsWithConn(testConnStr); err != nil {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
 	code := m.Run()
 
 	db.Close()
-	_ = container.Terminate(ctx)
 	os.Exit(code)
 }
 
@@ -626,7 +621,7 @@ func decodeJSON(data []byte, v any) error {
 - [ ] **Step 4: Run the integration tests and verify they pass**
 
 Run: `cd backend && go test ./... -run 'TestRegister|TestLogin|TestProtectedRouteRequiresAuth' -v`
-Expected: Docker pulls `postgres:16-alpine` on first run (may take a minute), then all subtests `PASS`. If it fails with a Docker connection error, confirm Docker/Podman is running (`docker ps` or `podman ps`).
+Expected: all subtests `PASS`. If `TestMain` fails to connect, confirm `invoice-postgres` is running (`podman ps` / `docker ps`) and reachable at `localhost:5432` with the credentials from `docker-compose.yml`.
 
 - [ ] **Step 5: Commit**
 

@@ -208,7 +208,7 @@ func authenticate() gin.HandlerFunc {
 func runMigrationsWithConn(connString string) error {
 	m, err := migrate.New("file://./migrations", connString)
 	if err != nil {
-		return fmt.Errorf("unable to create migration instanse: %w", err)
+		return fmt.Errorf("unable to create migration instance: %w", err)
 	}
 	defer m.Close()
 

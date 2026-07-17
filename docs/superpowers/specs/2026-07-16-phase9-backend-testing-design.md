@@ -14,7 +14,7 @@
 | Frontend testing | Deferred | Fokus belajar Go; frontend testing jadi phase terpisah nanti |
 | Router testability | Extract `setupRouter()` dari `main()` | Handler saat ini closure di dalam `main()` — gak bisa dipanggil dari test tanpa ini |
 | Handler refactor scope | Cuma pindah lokasi, bukan bongkar jadi named functions | Named-function conversion (seperti `analytics.go`) adalah improvement terpisah, di luar scope testing |
-| Test database | testcontainers-go | Container Postgres otomatis nyala/mati per test run, isolated, siap dipakai di CI (Phase 8) tanpa setup manual |
+| Test database | ~~testcontainers-go~~ → Dedicated DB (`invoicedb_test`) di Postgres dev yang sudah jalan | **Revisi 2026-07-17**: testcontainers-go gagal jalan — environment lokal pakai Podman rootless, yang networking-nya (slirp4netns/pasta) tidak kompatibel dengan cara testcontainers-go bikin container secara dinamis (butuh iptables DNAT ala dockerd asli). Lihat catatan revisi di bawah. |
 | Assertion library | testify (`assert`/`require`) | Standar de-facto di industri Go, dikurangin boilerplate dibanding `if err != nil { t.Fatal(...) }` |
 | Handler coverage | Representative slice per domain | Happy path + 1-2 error case per domain; bukan exhaustive semua endpoint/edge case |
 | Export (PDF/Excel/CSV) testing | Smoke test saja | Assert byte content PDF/Excel gak valuable; cukup pastikan gak error & content-type benar |
@@ -91,51 +91,62 @@ Test (`TestMain`) meng-assign `db = testDB` (reassign var package-level yang sam
 
 ---
 
-## 2. Test Database: testcontainers-go
+## 2. Test Database: dedicated `invoicedb_test` di Postgres dev yang sudah jalan
 
-**Dependency baru**: `github.com/testcontainers/testcontainers-go` + `github.com/testcontainers/testcontainers-go/modules/postgres` (test-only, masuk `go.mod` biasa karena Go tidak punya konsep "dev dependency" terpisah).
+**Revisi 2026-07-17 — kenapa bukan testcontainers-go:** Environment lokal (Manjaro) pakai **Podman rootless**, bukan dockerd asli — `docker` CLI di sini cuma shim ke Podman socket ("Context: podman"). Podman rootless pakai userspace networking (`slirp4netns`/`pasta`) buat port publishing, bukan `iptables` DNAT rules seperti dockerd. `testcontainers-go` bikin container secara dinamis dengan asumsi semantik dockerd asli, dan port-mapping-nya gagal dengan error `iptables ... missing kernel module` / `RULE_APPEND failed: rule in chain DOCKER`. Ini dicoba diperbaiki (disable Ryuk, restart Docker/Podman service) tapi errornya tetap persist — root cause-nya adalah incompatibility `nft_compat` di rootless Podman, bukan sesuatu yang bisa diperbaiki cepat dari sisi kode. Container yang dibuat lewat `docker-compose`/`dev-local.sh` (termasuk `invoice-postgres` yang jadi Postgres dev) tidak kena masalah ini karena Podman compose punya jalur setup networking sendiri (`netavark`) yang berbeda dari cara testcontainers-go bikin container satu-satu.
+
+Ini best-effort environment saat ini — kalau nanti pindah ke Docker asli atau nemu konfigurasi rootless Podman yang cocok, testcontainers-go bisa dipertimbangkan lagi (sudah tercatat di `TODO.md` Phase 8 sebagai "fix current Podman issues").
+
+**Pendekatan baru**: `TestMain` connect ke Postgres server yang sama dengan dev (`localhost:5432`, kredensial dari `docker-compose.yml`: `invoiceuser`/`invoicepassword`, superuser bootstrap image resmi jadi punya privilege `CREATEDB`), lalu drop+create database **terpisah** (`invoicedb_test`) khusus buat test setiap kali test suite dijalankan — database dev asli (`invoicedb`) sama sekali tidak tersentuh.
 
 **File**: `backend/main_test.go`
 
 ```go
 func TestMain(m *testing.M) {
+    gin.SetMode(gin.TestMode)
     ctx := context.Background()
 
-    container, err := postgres.Run(ctx, "postgres:16-alpine",
-        postgres.WithDatabase("invoice_test"),
-        postgres.WithUsername("test"),
-        postgres.WithPassword("test"),
-        testcontainers.WithWaitStrategy(
-            wait.ForListeningPort("5432/tcp"),
-        ),
-    )
+    adminConnStr := "postgres://invoiceuser:invoicepassword@localhost:5432/postgres?sslmode=disable"
+    adminPool, err := pgxpool.New(ctx, adminConnStr)
     if err != nil {
-        log.Fatalf("failed to start postgres container: %v", err)
+        log.Fatalf("failed to connect to postgres admin db: %v", err)
     }
-    defer container.Terminate(ctx)
 
-    connStr, err := container.ConnectionString(ctx, "sslmode=disable")
-    if err != nil {
-        log.Fatalf("failed to get connection string: %v", err)
+    // Terminate any lingering connections to the test db from a previous
+    // run so DROP DATABASE doesn't fail with "database is being accessed
+    // by other users".
+    _, _ = adminPool.Exec(ctx, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'invoicedb_test' AND pid <> pg_backend_pid()`)
+    if _, err := adminPool.Exec(ctx, `DROP DATABASE IF EXISTS invoicedb_test`); err != nil {
+        log.Fatalf("failed to drop test db: %v", err)
     }
+    if _, err := adminPool.Exec(ctx, `CREATE DATABASE invoicedb_test`); err != nil {
+        log.Fatalf("failed to create test db: %v", err)
+    }
+    adminPool.Close()
+
+    testConnStr := "postgres://invoiceuser:invoicepassword@localhost:5432/invoicedb_test?sslmode=disable"
 
     // Assign the package-level `db` var (declared in db.go) — every handler,
     // closure or named function, reads from this same var.
-    db, err = pgxpool.New(ctx, connStr)
+    db, err = pgxpool.New(ctx, testConnStr)
     if err != nil {
         log.Fatalf("failed to connect to test db: %v", err)
     }
 
-    if err := runMigrationsWithConn(connStr); err != nil {
+    if err := runMigrationsWithConn(testConnStr); err != nil {
         log.Fatalf("failed to run migrations: %v", err)
     }
 
     code := m.Run()
+
+    db.Close()
     os.Exit(code)
 }
 ```
 
-**Catatan implementasi**: `runMigrations()` saat ini ( `main.go:210`) membangun connection string dari env vars langsung di dalam fungsinya, jadi tidak bisa dipanggil dengan connection string test container. Perlu extract jadi:
+**Prasyarat**: container `invoice-postgres` (via `dev-local.sh` atau `docker compose up`) harus sudah jalan di `localhost:5432` sebelum `go test ./...` dijalankan — beda dari testcontainers-go yang otomatis nyalain Postgres-nya sendiri. Ini trade-off yang disadari, dicatat di `TODO.md` sebagai keterbatasan environment saat ini.
+
+**Catatan implementasi**: `runMigrations()` saat ini ( `main.go:210`) membangun connection string dari env vars langsung di dalam fungsinya, jadi tidak bisa dipanggil dengan connection string test database. Perlu extract jadi:
 
 ```go
 func runMigrationsWithConn(connString string) error {
@@ -160,7 +171,7 @@ func runMigrations() error {
 }
 ```
 
-`main()` tetap panggil `runMigrations()` (env-based), test `TestMain` panggil `runMigrationsWithConn(containerConnStr)`.
+`main()` tetap panggil `runMigrations()` (env-based), test `TestMain` panggil `runMigrationsWithConn(testConnStr)`.
 
 **Isolasi antar test**: tiap test function `TRUNCATE` tabel yang relevan di awal (via helper `truncateTables(t *testing.T, db *pgxpool.Pool)`), bukan transaction rollback — lebih simpel dan cukup buat ukuran project ini.
 
@@ -216,15 +227,13 @@ Ini bagian paling bernilai untuk belajar Go: verifikasi SQL aggregation (`SUM`, 
 
 ```
 go get github.com/stretchr/testify
-go get github.com/testcontainers/testcontainers-go
-go get github.com/testcontainers/testcontainers-go/modules/postgres
 
 go test ./...           # jalanin semua test
 go test ./... -v        # verbose
 go test ./... -cover    # coverage report
 ```
 
-**Prasyarat lokal**: Docker/Podman harus jalan (dipakai testcontainers buat spin up Postgres). Sudah konsisten dengan `dev-local.sh` yang juga butuh Docker/Podman.
+**Prasyarat lokal**: container `invoice-postgres` harus sudah jalan di `localhost:5432` (`./dev-local.sh` atau `docker compose up postgres`) sebelum `go test ./...` — lihat revisi di Section 2 soal kenapa bukan testcontainers-go.
 
 ---
 
@@ -242,7 +251,7 @@ Sebagai bagian dari implementasi:
 backend/
   main.go                [MODIFIED — extract routing ke setupRouter()]
   router.go               [NEW — setupRouter(db *pgxpool.Pool) *gin.Engine]
-  main_test.go             [NEW — TestMain, testcontainers setup]
+  main_test.go             [NEW — TestMain, dedicated invoicedb_test setup]
   logic_test.go            [NEW — pure unit tests]
   auth_test.go             [NEW — integration tests]
   invoices_test.go         [NEW — integration tests]
@@ -250,7 +259,7 @@ backend/
   products_test.go         [NEW — integration tests]
   analytics_test.go        [NEW — integration tests + seed data]
   export_test.go           [NEW — smoke tests]
-  go.mod / go.sum          [MODIFIED — testify, testcontainers-go deps]
+  go.mod / go.sum          [MODIFIED — testify dep]
 
 TODO.md                   [MODIFIED — centang Phase 5, update Phase 9]
 
@@ -266,7 +275,7 @@ docs/superpowers/specs/
 - E2E browser tests (Cypress/Playwright) — butuh frontend testing dulu
 - Exhaustive edge-case coverage di semua handler — representative slice cukup untuk tujuan portfolio + belajar
 - Byte-level assertion pada PDF/Excel output — smoke test cukup
-- CI/CD integration (GitHub Actions run test otomatis) — itu Phase 8, tapi desain testcontainers-go di sini sengaja dipilih supaya kompatibel waktu Phase 8 dikerjakan
+- CI/CD integration (GitHub Actions run test otomatis) — itu Phase 8. Catatan: pendekatan "dedicated DB di Postgres yang sudah jalan" butuh Postgres service tersedia duluan di CI (misal `services:` di GitHub Actions), beda dari testcontainers-go yang self-contained — perlu diperhitungkan pas Phase 8 dikerjakan
 
 ---
 
