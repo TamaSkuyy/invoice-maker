@@ -431,7 +431,7 @@ func setupRouter() *gin.Engine {
 			// Fetch and return updated invoice
 			var updatedInv Invoice
 			err = db.QueryRow(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1", id).
-				Scan(&updatedInv.ID, &updatedInv.ClientName, &updatedInv.Date, &updatedInv.TaxRate, &updatedInv.TotalAmount, &updatedInv.UserID, &updatedInv.CreatedAt, &updatedInv.UpdatedAt)
+				Scan(&updatedInv.ID, &updatedInv.ClientName, &updatedInv.ClientID, &updatedInv.Date, &updatedInv.TaxRate, &updatedInv.TotalAmount, &updatedInv.UserID, &updatedInv.CreatedAt, &updatedInv.UpdatedAt)
 			if err != nil {
 				log.Printf("fetch updated invoice error: %v", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch updated invoice"})
