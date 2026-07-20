@@ -130,7 +130,7 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### Dashboard
 
-- [x] Display key metrics (total invoiced, paid, pending) — total invoiced ✅; paid/pending skipped (butuh Phase 6 `status` field)
+- [x] Display key metrics (total invoiced, paid, pending) — total invoiced ✅ (Phase 5); paid/pending/overdue ✅ (Phase 6 — `AnalyticsOverview.paid_amount`, `pending_amount`, `overdue_count` available in overview endpoint + DashboardCards)
 - [x] Revenue chart (monthly/yearly)
 - [x] Top clients chart
 - [ ] Outstanding invoices chart — skipped (butuh Phase 6)
@@ -154,23 +154,23 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### Invoice Status Tracking
 
-- [ ] Add status field: Draft, Sent, Paid, Overdue, Cancelled
-- [ ] Status history log (when status changes, by whom)
-- [ ] Filter invoices by status
+- [x] Add status field: Draft, Sent, Paid, Overdue, Cancelled — hybrid model: manual (Draft→Sent, Draft/Sent→Cancelled) + auto (Payments≥Total→Paid, due_date<today→Overdue)
+- [x] Status history log (when status changes, by whom) — `status_history` table with audit trail
+- [x] Filter invoices by status — `GET /api/invoices?status=Draft|Sent|Paid|Overdue|Cancelled`
 
 ### Payment Tracking
 
-- [ ] Record partial & full payments
-- [ ] Payment date tracking
-- [ ] Payment method recording
+- [x] Record partial & full payments — `payments` table, auto-Paid trigger when SUM≥total
+- [x] Payment date tracking — `payments.date` column
+- [x] Payment method recording — `payments.method` free-text field
 
-### Payment Gateway Integration (Optional)
+### Payment Gateway Integration (Optional) — deferred
 
 - [ ] Integrate Stripe or similar for online payments
 - [ ] Send payment links to clients
 - [ ] Auto-update invoice status when paid
 
-### Email Notifications
+### Email Notifications — deferred
 
 - [ ] Send invoice to client via email (PDF attachment)
 - [ ] Payment reminder emails
@@ -178,9 +178,14 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### Learning Goal
 
-- Learn payment processing & security
-- Understand email sending services
-- Practice async task queuing (Celery, Bull, etc.)
+- ✅ SQL state machines (hybrid manual/auto status transitions)
+- ✅ Audit trail pattern (`status_history` table + FK to users)
+- ✅ Computed state (Overdue derived at query time with `CASE WHEN`, never stored)
+- ✅ Aggregation triggers (auto-Paid when `SUM(payments.amount) >= total_amount`)
+- ✅ Dynamic query building in Go (status filter with optional WHERE clauses)
+- ✅ Multi-user isolation extended to new resources (status changes, payment recording)
+- Learn payment processing & security — deferred (Stripe sub-phase)
+- Understand email sending services — deferred (email sub-phase)
 
 ---
 
