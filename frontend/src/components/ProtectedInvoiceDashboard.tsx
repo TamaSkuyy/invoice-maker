@@ -41,12 +41,14 @@ export function ProtectedInvoiceDashboard({
   const [topClients, setTopClients] = useState<TopClientData[]>([]);
   const [taxSummary, setTaxSummary] = useState<TaxDataPoint[]>([]);
   const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [statusFilter, setStatusFilter] = useState("")
 
   // Fetch saved invoices
   useEffect(() => {
     const fetchInvoices = async () => {
       try {
-        const invoices = await apiFetch<Invoice[]>("/invoices");
+        const url = `/invoices${statusFilter ? `?status=${statusFilter}` : ""}`
+        const invoices = await apiFetch<Invoice[]>(url);
         setSavedInvoices(invoices || []);
       } catch (err) {
         console.error("Failed to fetch invoices:", err);
@@ -55,7 +57,7 @@ export function ProtectedInvoiceDashboard({
       }
     };
     fetchInvoices();
-  }, []);
+  }, [statusFilter]);
 
   // Fetch analytics data
   const fetchAnalytics = useCallback(async (year: number) => {
@@ -97,6 +99,55 @@ export function ProtectedInvoiceDashboard({
       setExporting(null);
     }
   };
+
+  const handleChangeStatus = async (invoiceId: string, newStatus: string) => {
+    try {
+      await apiFetch(`/invoices/${invoiceId}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ status: newStatus }),
+      })
+      // Re-fetch invoices
+      const url = `/invoices${statusFilter ? `?status=${statusFilter}` : ""}`
+      const invoices = await apiFetch<Invoice[]>(url)
+      setSavedInvoices(invoices || [])
+    } catch (err) {
+      console.error("Failed to change status:", err)
+    }
+  }
+
+  const handleRecordPayment = async (invoiceId: string, amount: number, date: string, method: string) => {
+    try {
+      await apiFetch(`/invoices/${invoiceId}/payments`, {
+        method: "POST",
+        body: JSON.stringify({ amount, date, method }),
+      })
+      // Refresh invoices
+      const url = `/invoices${statusFilter ? `?status=${statusFilter}` : ""}`
+      const invoices = await apiFetch<Invoice[]>(url)
+      setSavedInvoices(invoices || [])
+    } catch (err) {
+      console.error("Failed to record payment:", err)
+    }
+  }
+
+  // Status Colors
+  const STATUS_COLORS: Record<string, string> = {
+    Draft: "bg-gray-100 text-gray-700",
+    Sent: "bg-blue-100 text-blue-700",
+    Paid: "bg-green-100 text-green-700",
+    Overdue: "bg-red-100 text-red-700",
+    Cancelled: "bg-gray-100 text-gray-400 line-through",
+  }
+
+  function StatusBadge({ status = "Draft" }: { status?: string }) {
+    const currentStatus = status || "Draft"
+    const colorClass = STATUS_COLORS[currentStatus] || STATUS_COLORS.Draft
+    return (
+      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
+        {currentStatus}
+      </span>
+    )
+  }
 
   return (
     <>
@@ -182,6 +233,18 @@ export function ProtectedInvoiceDashboard({
               >
                 {exporting === "Excel" ? "Exporting..." : "Export to Excel"}
               </button>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-1 border rounded text-sm"
+              >
+                <option value="">All Status</option>
+                <option value="Draft">Draft</option>
+                <option value="Sent">Sent</option>
+                <option value="Paid">Paid</option>
+                <option value="Overdue">Overdue</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
             </div>
             <div className="overflow-x-auto rounded-xl bg-white shadow">
               <table className="w-full text-sm">
@@ -191,6 +254,7 @@ export function ProtectedInvoiceDashboard({
                     <th className="px-4 py-3 text-left">Client</th>
                     <th className="px-4 py-3 text-left">Date</th>
                     <th className="px-4 py-3 text-right">Total</th>
+                    <th className="px-4 py-3 text-center">Status</th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
@@ -210,9 +274,28 @@ export function ProtectedInvoiceDashboard({
                       <td className="px-4 py-3 text-right font-mono font-semibold text-blue-600">
                         Rp {(inv.total_amount ?? 0).toFixed(2)}
                       </td>
+                      <td>
+                         <StatusBadge status={inv.status} />
+                      </td>
                       <td className="px-4 py-3 text-right space-x-2">
+                        {inv.status === "Draft" && (
+                          <button
+                            onClick={() => inv.id && handleChangeStatus(inv.id, "Sent")}
+                            className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                          >
+                            Mark as Sent
+                          </button>
+                        )}
+                        {(inv.status === "Draft" || inv.status === "Sent") && (
+                          <button
+                            onClick={() => inv.id && handleChangeStatus(inv.id, "Cancelled")}
+                            className="text-xs px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 ml-1"
+                          >
+                            Cancel
+                          </button>
+                        )}
                         <button
-                          onClick={() => handleDownload(`/invoices/${inv.id}/pdf`, `invoice-${inv.id!.slice(0, 8)}.pdf`, "PDF")}
+                          onClick={() => inv.id && handleDownload(`/invoices/${inv.id}/pdf`, `invoice-${inv.id.slice(0, 8)}.pdf`, "PDF")}
                           disabled={exporting !== null}
                           className="text-green-600 hover:underline text-xs"
                         >
@@ -225,11 +308,37 @@ export function ProtectedInvoiceDashboard({
                           View
                         </button>
                       </td>
+                      {/* Payment form */}
+                      <form onSubmit={(e) => { 
+                        e.preventDefault()
+                        const fd = new FormData(e.currentTarget)
+                        const amount = Number(fd.get("amount") ?? "0")
+                        const date = fd.get("date")?.toString() ?? ""
+                        const method = fd.get("method")?.toString() ?? "Transfer"
+                        if (inv.id) handleRecordPayment(inv.id, amount, date, method) }} className="mt-2 flex gap-2 text-sm">
+                        <input name="amount" type="number" placeholder="Amount" className="w-24 border px-1 rounded" />
+                        <input name="date" type="date" className="border px-1 rounded" />
+                        <select name="method" className="border px-1 rounded">
+                          <option>Transfer</option>
+                          <option>Cash</option>
+                          <option>Credit Card</option>
+                          <option>Check</option>
+                        </select>
+                        <button type="submit" className="px-2 py-0.5 bg-green-500 text-white rounded text-xs">
+                          Record Payment
+                        </button>
+                      </form>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+
+            {/* {payments[invoice.id]?.map((p: Payment) => (
+              <div key={p.id} className="text-xs text-gray-500 ml-2">
+                {p.date} — {formatIDR(p.amount)} via {p.method}
+              </div>
+            ))} */}
           </section>
         )}
 

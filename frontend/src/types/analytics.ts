@@ -3,6 +3,9 @@ export interface AnalyticsOverview {
   total_invoices: number
   total_clients: number
   avg_invoice_value: number
+  paid_amount: number
+  pending_amount: number
+  overdue_count: number
 }
 
 export interface RevenueDataPoint {

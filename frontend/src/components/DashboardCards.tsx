@@ -43,6 +43,9 @@ export function DashboardCards({ data, loading }: DashboardCardsProps) {
     { label: "Total Invoices", value: `${data.total_invoices}`, color: "text-emerald-600" },
     { label: "Total Clients", value: `${data.total_clients}`, color: "text-violet-600" },
     { label: "Avg Invoice", value: formatIDR(data.avg_invoice_value), color: "text-amber-600" },
+    { label: "Paid Revenue", value: formatIDR(data.paid_amount), color: "text-green-600" },
+    { label: "Pending Revenue", value: formatIDR(data.pending_amount), color: "text-amber-600" },
+    { label: "Overdue Invoices", value: `${data.overdue_count}`, color: "text-red-600" },
   ];
 
   return (
