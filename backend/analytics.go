@@ -79,12 +79,18 @@ func handleAnalyticsOverview(c *gin.Context) {
 	err := db.QueryRow(ctx, `
 		SELECT
 			COALESCE(SUM(total_amount), 0),
-			COUNT(*),
-			COUNT(DISTINCT client_id),
-			CASE WHEN COUNT(*) > 0 THEN SUM(total_amount) / COUNT(*) ELSE 0 END
+    COUNT(*),
+    COUNT(DISTINCT client_id),
+    CASE WHEN COUNT(*) > 0 THEN SUM(total_amount) / COUNT(*) ELSE 0 END,
+    COALESCE(SUM(CASE WHEN status = 'Paid' THEN total_amount ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN status IN ('Draft','Sent') AND (due_date IS NULL OR due_date >= CURRENT_DATE) THEN total_amount ELSE 0 END), 0),
+    COUNT(CASE WHEN status NOT IN ('Paid','Cancelled') AND due_date < CURRENT_DATE THEN 1 END)
 		FROM invoices
 		WHERE user_id = $1
-	`, userID).Scan(&o.TotalRevenue, &o.TotalInvoices, &o.TotalClients, &o.AvgInvoiceValue)
+	`, userID).Scan(
+		&o.TotalRevenue, &o.TotalInvoices, &o.TotalClients, &o.AvgInvoiceValue,
+    	&o.PaidAmount, &o.PendingAmount, &o.OverdueCount,
+	)
 	if err != nil {
 		log.Printf("analytics overview error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch analytics"})
