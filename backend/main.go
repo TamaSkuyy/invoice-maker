@@ -31,9 +31,11 @@ type Invoice struct {
 	ClientName  string        `json:"client_name"`
 	ClientID    *string       `json:"client_id"`
 	Date        string        `json:"date"`
+	DueDate     string        `json:"due_date"`
 	Items       []InvoiceItem `json:"items"`
 	TaxRate     float64       `json:"tax_rate"`
 	TotalAmount float64       `json:"total_amount"`
+	Status      string        `json:"status"`
 	UserID      string        `json:"user_id"`
 	CreatedAt   time.Time     `json:"created_at"`
 	UpdatedAt   time.Time     `json:"updated_at"`
@@ -93,6 +95,40 @@ type Product struct {
 	DefaultPrice float64   `json:"default_price"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// Payment represents a recorded payment toward an invoice.
+type Payment struct {
+	ID         string    `json:"id"`
+	InvoiceID  string    `json:"invoice_id"`
+	Amount     float64   `json:"amount"`
+	Date       string    `json:"date"`
+	Method     string    `json:"method"`
+	RecordedBy string    `json:"recorded_by"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+
+// StatusHistoryEntry records a single status change for audit trail
+type StatusHistoryEntry struct {
+	ID			string		`json:"id"`
+	InvoiceID	string		`json:"invoice_id"`
+	OldStatus	*string		`json:"old_status"`
+	NewStatus	string		`json:"new_status"`
+	ChangedBy	string		`json:"changed_by"`
+	ChangedAt	time.Time	`json:"changed_at"`
+}
+
+// StatusChangeRequest is the request body for PUT /api/invoices/:id/status
+type StatusChangeRequest struct {
+	Status string `json:"status" binding:"required"`
+}
+
+// PaymentRequest is the request body for POST /api/invoices/:id/payments
+type PaymentRequest struct {
+	Amount	float64	`json:"amount" binding:"required,gt=0"`
+	Date	string	`json:"date" binding:"required"`
+	Method	string	`json:"method" binding:"required"`
 }
 
 // round2 rounds a float to 2 decimal places.

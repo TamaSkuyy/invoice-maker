@@ -21,6 +21,9 @@ type AnalyticsOverview struct {
 	TotalInvoices   int     `json:"total_invoices"`
 	TotalClients    int     `json:"total_clients"`
 	AvgInvoiceValue float64 `json:"avg_invoice_value"`
+	PaidAmount		float64	`json:"paid_amount"`
+	PendingAmount	float64	`json:"pending_amount"`
+	OverdueCount	int		`json:"overdue_count"`
 }
 
 type RevenueDataPoint struct {
