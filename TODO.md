@@ -130,17 +130,17 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### Dashboard
 
-- [ ] Display key metrics (total invoiced, paid, pending)
-- [ ] Revenue chart (monthly/yearly)
-- [ ] Top clients chart
-- [ ] Outstanding invoices chart
+- [x] Display key metrics (total invoiced, paid, pending) — total invoiced ✅; paid/pending skipped (butuh Phase 6 `status` field)
+- [x] Revenue chart (monthly/yearly)
+- [x] Top clients chart
+- [ ] Outstanding invoices chart — skipped (butuh Phase 6)
 
 ### Reports
 
-- [ ] Generate financial reports (PDF/Excel)
-- [ ] Tax summary report
-- [ ] Client payment history report
-- [ ] Time-based analytics (weekly, monthly, yearly)
+- [x] Generate financial reports (PDF/Excel)
+- [x] Tax summary report
+- [ ] Client payment history report — skipped (butuh Phase 6)
+- [x] Time-based analytics (weekly, monthly, yearly)
 
 ### Learning Goal
 
@@ -246,10 +246,10 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### Backend Testing
 
-- [ ] Unit tests for API handlers
-- [ ] Integration tests with test database
-- [ ] End-to-end tests for full workflows
-- [ ] Test coverage > 80%
+- [x] Unit tests for pure functions (`round2`, `calculateTotal`, password hashing, JWT generate/validate) — see `backend/logic_test.go`
+- [x] Integration tests with test database (`invoicedb_test`) — auth, invoices (CRUD + isolation), clients, products, analytics, export smoke tests — see `backend/*_test.go`, 17 test functions, **67.0% coverage**
+- [ ] End-to-end tests for full workflows — deferred (frontend testing phase)
+- [x] Test coverage tracked via `go test ./... -cover` — realistic target 50-60% noted; achieved 67.0%. Export/PDF byte-level output intentionally not exhaustive-tested — see `docs/superpowers/specs/2026-07-16-phase9-backend-testing-design.md`
 
 ### Frontend Testing
 
@@ -273,7 +273,7 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### Learning Goal
 
-- Understand testing strategies & best practices
+- Understand testing strategies & best practices — ✅ table-driven tests, httptest, integration w/ real Postgres, `TestMain`, test isolation (TRUNCATE), multi-user isolation, SQL aggregation verification, smoke tests for binary output. Pattern-to-concept mapping documented in `docs/superpowers/plans/2026-07-16-phase9-backend-testing.md`.
 - Learn TDD approach
 - Practice code quality standards
 
