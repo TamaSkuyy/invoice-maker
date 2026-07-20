@@ -160,7 +160,7 @@ func setupRouter() *gin.Engine {
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 			defer cancel()
 
-			rows, err := db.Query(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE user_id = $1 ORDER BY created_at DESC", userID)
+			rows, err := db.Query(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), COALESCE(CAST(due_date AS TEXT), ''), tax_rate, total_amount, status, user_id, created_at, updated_at FROM invoices WHERE user_id = $1 ORDER BY created_at DESC", userID)
 			if err != nil {
 				log.Printf("query error: %v", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch invoices"})
@@ -171,7 +171,7 @@ func setupRouter() *gin.Engine {
 			var invoices []Invoice
 			for rows.Next() {
 				var inv Invoice
-				if err := rows.Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt); err != nil {
+				if err := rows.Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.DueDate, &inv.TaxRate, &inv.TotalAmount, &inv.Status, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt); err != nil {
 					log.Printf("scan error: %v", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse invoices"})
 					return
@@ -207,60 +207,60 @@ func setupRouter() *gin.Engine {
 			}
 
 			c.JSON(http.StatusOK, invoices)
-			})
+		})
 
-			// Export all invoices to Excel (MUST be before /:id to avoid route conflict)
-			api.GET("/export/excel", func(c *gin.Context) {
-				userID, _ := c.Get("user_id")
-				ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
-				defer cancel()
+		// Export all invoices to Excel (MUST be before /:id to avoid route conflict)
+		api.GET("/export/excel", func(c *gin.Context) {
+			userID, _ := c.Get("user_id")
+			ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+			defer cancel()
 
-				rows, err := db.Query(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE user_id = $1 ORDER BY created_at DESC", userID)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch invoices"})
+			rows, err := db.Query(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), COALESCE(CAST(due_date AS TEXT), ''), tax_rate, total_amount, status, user_id, created_at, updated_at FROM invoices WHERE user_id = $1 ORDER BY created_at DESC", userID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch invoices"})
+				return
+			}
+			defer rows.Close()
+
+			var invoices []Invoice
+			for rows.Next() {
+				var inv Invoice
+				if err := rows.Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.DueDate, &inv.TaxRate, &inv.TotalAmount, &inv.Status, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt); err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse invoices"})
 					return
 				}
-				defer rows.Close()
+				var itemCount int
+				db.QueryRow(ctx, "SELECT COUNT(*) FROM invoice_items WHERE invoice_id = $1", inv.ID).Scan(&itemCount)
+				inv.Items = make([]InvoiceItem, itemCount)
+				invoices = append(invoices, inv)
+			}
 
-				var invoices []Invoice
-				for rows.Next() {
-					var inv Invoice
-					if err := rows.Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt); err != nil {
-						c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse invoices"})
-						return
-					}
-					var itemCount int
-					db.QueryRow(ctx, "SELECT COUNT(*) FROM invoice_items WHERE invoice_id = $1", inv.ID).Scan(&itemCount)
-					inv.Items = make([]InvoiceItem, itemCount)
-					invoices = append(invoices, inv)
-				}
+			if invoices == nil {
+				invoices = []Invoice{}
+			}
 
-				if invoices == nil {
-					invoices = []Invoice{}
-				}
+			data, err := generateInvoicesExcel(invoices)
+			if err != nil {
+				log.Printf("excel generation error: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate Excel"})
+				return
+			}
 
-				data, err := generateInvoicesExcel(invoices)
-				if err != nil {
-					log.Printf("excel generation error: %v", err)
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate Excel"})
-					return
-				}
+			c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+			c.Header("Content-Disposition", "attachment; filename=invoices.xlsx")
+			c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+		})
 
-				c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-				c.Header("Content-Disposition", "attachment; filename=invoices.xlsx")
-				c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
-			})
-
-			// Get a single invoice (with ownership check)
-			api.GET("/:id", func(c *gin.Context) {
+		// Get a single invoice (with ownership check)
+		api.GET("/:id", func(c *gin.Context) {
 			id := c.Param("id")
 			userID, _ := c.Get("user_id")
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 			defer cancel()
 
 			var inv Invoice
-			err := db.QueryRow(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
-				Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
+			err := db.QueryRow(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), COALESCE(CAST(due_date AS TEXT), ''), tax_rate, total_amount, status, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
+				Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.DueDate, &inv.TaxRate, &inv.TotalAmount, &inv.Status, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
 			if err != nil {
 				c.JSON(http.StatusNotFound, gin.H{"error": "invoice not found"})
 				return
@@ -320,10 +320,15 @@ func setupRouter() *gin.Engine {
 			}
 			defer tx.Rollback(ctx)
 
+			var dueDate interface{}
+			if input.DueDate != "" {
+				dueDate = input.DueDate
+			}
+
 			// Insert invoice
 			_, err = tx.Exec(ctx,
-				"INSERT INTO invoices (id, client_name, client_id, date, tax_rate, total_amount, user_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-				input.ID, input.ClientName, input.ClientID, input.Date, input.TaxRate, input.TotalAmount, input.UserID, input.CreatedAt, input.UpdatedAt,
+				"INSERT INTO invoices (id, client_name, client_id, date, due_date, tax_rate, total_amount, status, user_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+				input.ID, input.ClientName, input.ClientID, input.Date, dueDate, input.TaxRate, input.TotalAmount, "Draft", input.UserID, input.CreatedAt, input.UpdatedAt,
 			)
 			if err != nil {
 				log.Printf("insert invoice error: %v", err)
@@ -389,10 +394,15 @@ func setupRouter() *gin.Engine {
 			}
 			defer tx.Rollback(ctx)
 
+			var dueDate interface{}
+			if input.DueDate != "" {
+				dueDate = input.DueDate
+			}
+
 			// Update invoice
 			_, err = tx.Exec(ctx,
-				"UPDATE invoices SET client_name = $1, date = $2, tax_rate = $3, total_amount = $4, updated_at = $5 WHERE id = $6",
-				input.ClientName, input.Date, input.TaxRate, input.TotalAmount, input.UpdatedAt, id,
+				"UPDATE invoices SET client_name = $1, date = $2, due_date = $3, tax_rate = $4, total_amount = $5, updated_at = $6 WHERE id = $7",
+				input.ClientName, input.Date, dueDate, input.TaxRate, input.TotalAmount, input.UpdatedAt, id,
 			)
 			if err != nil {
 				log.Printf("update invoice error: %v", err)
@@ -430,8 +440,8 @@ func setupRouter() *gin.Engine {
 
 			// Fetch and return updated invoice
 			var updatedInv Invoice
-			err = db.QueryRow(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1", id).
-				Scan(&updatedInv.ID, &updatedInv.ClientName, &updatedInv.ClientID, &updatedInv.Date, &updatedInv.TaxRate, &updatedInv.TotalAmount, &updatedInv.UserID, &updatedInv.CreatedAt, &updatedInv.UpdatedAt)
+			err = db.QueryRow(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), COALESCE(CAST(due_date AS TEXT), ''), tax_rate, total_amount, status, user_id, created_at, updated_at FROM invoices WHERE id = $1", id).
+				Scan(&updatedInv.ID, &updatedInv.ClientName, &updatedInv.ClientID, &updatedInv.Date, &updatedInv.DueDate, &updatedInv.TaxRate, &updatedInv.TotalAmount, &updatedInv.Status, &updatedInv.UserID, &updatedInv.CreatedAt, &updatedInv.UpdatedAt)
 			if err != nil {
 				log.Printf("fetch updated invoice error: %v", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch updated invoice"})
@@ -486,94 +496,106 @@ func setupRouter() *gin.Engine {
 			}
 
 			c.JSON(http.StatusOK, gin.H{"message": "invoice deleted"})
-			})
+		})
 
-			// Download invoice as PDF
-			api.GET("/:id/pdf", func(c *gin.Context) {
-				id := c.Param("id")
-				userID, _ := c.Get("user_id")
-				ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
-				defer cancel()
+		// Download invoice as PDF
+		api.GET("/:id/pdf", func(c *gin.Context) {
+			id := c.Param("id")
+			userID, _ := c.Get("user_id")
+			ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+			defer cancel()
 
-				var inv Invoice
-				err := db.QueryRow(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
-					Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
-				if err != nil {
-					c.JSON(http.StatusNotFound, gin.H{"error": "invoice not found"})
+			var inv Invoice
+			err := db.QueryRow(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), COALESCE(CAST(due_date AS TEXT), ''), tax_rate, total_amount, status, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
+				Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.DueDate, &inv.TaxRate, &inv.TotalAmount, &inv.Status, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
+			if err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "invoice not found"})
+				return
+			}
+
+			itemRows, err := db.Query(ctx, "SELECT description, qty, price FROM invoice_items WHERE invoice_id = $1 ORDER BY created_at", id)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch items"})
+				return
+			}
+			defer itemRows.Close()
+
+			for itemRows.Next() {
+				var item InvoiceItem
+				if err := itemRows.Scan(&item.Description, &item.Qty, &item.Price); err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse items"})
 					return
 				}
+				inv.Items = append(inv.Items, item)
+			}
 
-				itemRows, err := db.Query(ctx, "SELECT description, qty, price FROM invoice_items WHERE invoice_id = $1 ORDER BY created_at", id)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch items"})
+			pdfData, err := generateInvoicePDF(inv)
+			if err != nil {
+				log.Printf("pdf generation error: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate PDF"})
+				return
+			}
+
+			c.Header("Content-Type", "application/pdf")
+			c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=invoice-%s.pdf", id[:8]))
+			c.Data(http.StatusOK, "application/pdf", pdfData)
+		})
+
+		// Download invoice as CSV
+		api.GET("/:id/csv", func(c *gin.Context) {
+			id := c.Param("id")
+			userID, _ := c.Get("user_id")
+			ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+			defer cancel()
+
+			var inv Invoice
+			err := db.QueryRow(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), COALESCE(CAST(due_date AS TEXT), ''), tax_rate, total_amount, status, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
+				Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.DueDate, &inv.TaxRate, &inv.TotalAmount, &inv.Status, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
+			if err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "invoice not found"})
+				return
+			}
+
+			itemRows, err := db.Query(ctx, "SELECT description, qty, price FROM invoice_items WHERE invoice_id = $1 ORDER BY created_at", id)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch items"})
+				return
+			}
+			defer itemRows.Close()
+
+			for itemRows.Next() {
+				var item InvoiceItem
+				if err := itemRows.Scan(&item.Description, &item.Qty, &item.Price); err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse items"})
 					return
 				}
-				defer itemRows.Close()
+				inv.Items = append(inv.Items, item)
+			}
 
-				for itemRows.Next() {
-					var item InvoiceItem
-					if err := itemRows.Scan(&item.Description, &item.Qty, &item.Price); err != nil {
-						c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse items"})
-						return
-					}
-					inv.Items = append(inv.Items, item)
-				}
+			csvData, err := generateInvoiceCSV(inv)
+			if err != nil {
+				log.Printf("csv generation error: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate CSV"})
+				return
+			}
 
-				pdfData, err := generateInvoicePDF(inv)
-				if err != nil {
-					log.Printf("pdf generation error: %v", err)
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate PDF"})
-					return
-				}
+			c.Header("Content-Type", "text/csv")
+			c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=invoice-%s.csv", id[:8]))
+			c.Data(http.StatusOK, "text/csv", csvData)
+		})
 
-				c.Header("Content-Type", "application/pdf")
-				c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=invoice-%s.pdf", id[:8]))
-				c.Data(http.StatusOK, "application/pdf", pdfData)
-			})
+		// Set invoice status (manual transition)
+		api.PUT("/:id/status", handleSetInvoiceStatus)
 
-			// Download invoice as CSV
-			api.GET("/:id/csv", func(c *gin.Context) {
-				id := c.Param("id")
-				userID, _ := c.Get("user_id")
-				ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
-				defer cancel()
+		// Get invoice status history
+		api.GET("/:id/history", handleStatusHistory)
 
-				var inv Invoice
-				err := db.QueryRow(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), tax_rate, total_amount, user_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2", id, userID).
-					Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.TaxRate, &inv.TotalAmount, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt)
-				if err != nil {
-					c.JSON(http.StatusNotFound, gin.H{"error": "invoice not found"})
-					return
-				}
+		// Record a payment
+		// api.POST("/:id/payments", handleRecordPayment)
 
-				itemRows, err := db.Query(ctx, "SELECT description, qty, price FROM invoice_items WHERE invoice_id = $1 ORDER BY created_at", id)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch items"})
-					return
-				}
-				defer itemRows.Close()
-
-				for itemRows.Next() {
-					var item InvoiceItem
-					if err := itemRows.Scan(&item.Description, &item.Qty, &item.Price); err != nil {
-						c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse items"})
-						return
-					}
-					inv.Items = append(inv.Items, item)
-				}
-
-				csvData, err := generateInvoiceCSV(inv)
-				if err != nil {
-					log.Printf("csv generation error: %v", err)
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate CSV"})
-					return
-				}
-
-				c.Header("Content-Type", "text/csv")
-				c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=invoice-%s.csv", id[:8]))
-				c.Data(http.StatusOK, "text/csv", csvData)
-			})
-		}
+		// List payments for an invoice
+		// api.GET("/:id/payments", handleListPayments)
+	}
 
 		// Client management routes (protected)
 		clients := r.Group("/api/clients")
