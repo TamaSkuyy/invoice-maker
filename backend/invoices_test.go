@@ -107,3 +107,81 @@ func  TestInvoiceIsolationBetweenUsers(t *testing.T) {
 	require.NoError(t, decodeJSON(listRec.Body.Bytes(), &invoices))
 	assert.Empty(t, invoices)
 }
+
+func TestInvoiceStatusFilter(t *testing.T) {
+	truncateTables(t)
+	router := setupRouter()
+	token := registerTestUser(t, router, "filterstatus@mail.com", "password")
+
+	// Create a Draft invoice (default).
+	draftRec := doRequest(router, http.MethodPost, "/api/invoices", Invoice{
+		ClientName: "Draft Invoice",
+		Date:       "2026-07-20",
+		TaxRate:    0,
+		Items:      []InvoiceItem{{Description: "Item", Qty: 1, Price: 100}},
+	}, token)
+	require.Equal(t, http.StatusCreated, draftRec.Code)
+	var draftInv Invoice
+	decodeJSON(draftRec.Body.Bytes(), &draftInv)
+
+	// Create another and mark as Sent.
+	sentRec := doRequest(router, http.MethodPost, "/api/invoices", Invoice{
+		ClientName: "Sent Invoice",
+		Date:       "2026-07-20",
+		TaxRate:    0,
+		Items:      []InvoiceItem{{Description: "Item", Qty: 1, Price: 100}},
+	}, token)
+	var sentInv Invoice
+	decodeJSON(sentRec.Body.Bytes(), &sentInv)
+	doRequest(router, http.MethodPut, "/api/invoices/"+sentInv.ID+"/status",
+		StatusChangeRequest{Status: "Sent"}, token)
+
+	// List all — should return 2.
+	allRec := doRequest(router, http.MethodGet, "/api/invoices", nil, token)
+	var all []Invoice
+	decodeJSON(allRec.Body.Bytes(), &all)
+	assert.Len(t, all, 2)
+
+	// Filter by Draft — should return 1.
+	draftFilter := doRequest(router, http.MethodGet, "/api/invoices?status=Draft", nil, token)
+	var drafts []Invoice
+	decodeJSON(draftFilter.Body.Bytes(), &drafts)
+	require.Len(t, drafts, 1)
+	assert.Equal(t, "Draft", drafts[0].Status)
+
+	// Filter by Sent — should return 1.
+	sentFilter := doRequest(router, http.MethodGet, "/api/invoices?status=Sent", nil, token)
+	var sents []Invoice
+	decodeJSON(sentFilter.Body.Bytes(), &sents)
+	require.Len(t, sents, 1)
+	assert.Equal(t, "Sent", sents[0].Status)
+}
+
+func TestInvoiceOverdueAppearsInFilter(t *testing.T) {
+	truncateTables(t)
+	router := setupRouter()
+	token := registerTestUser(t, router, "overduefilter@mail.com", "password")
+
+	// Create invoice with due_date in the past.
+	rec := doRequest(router, http.MethodPost, "/api/invoices", Invoice{
+		ClientName: "Overdue Invoice",
+		Date:       "2026-01-01",
+		DueDate:    "2026-01-15",
+		TaxRate:    0,
+		Items:      []InvoiceItem{{Description: "Item", Qty: 1, Price: 100}},
+	}, token)
+	require.Equal(t, http.StatusCreated, rec.Code)
+	var inv Invoice
+	decodeJSON(rec.Body.Bytes(), &inv)
+
+	// MARK AS SENT (overdue only computed for Sent invoices with past due_date).
+	doRequest(router, http.MethodPut, "/api/invoices/"+inv.ID+"/status",
+		StatusChangeRequest{Status: "Sent"}, token)
+
+	// Filter by Overdue — should include it (due_date is 2026-01-15, today is later).
+	overdueFilter := doRequest(router, http.MethodGet, "/api/invoices?status=Overdue", nil, token)
+	var overdue []Invoice
+	decodeJSON(overdueFilter.Body.Bytes(), &overdue)
+	require.Len(t, overdue, 1)
+	assert.Equal(t, "Sent", overdue[0].Status) // stored status is Sent, filter is computed
+}

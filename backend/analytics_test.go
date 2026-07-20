@@ -36,6 +36,14 @@ func TestAnalyticsOverview(t *testing.T) {
 	assert.Equal(t, 3000.0, overview.TotalRevenue)
 	assert.Equal(t, 2, overview.TotalInvoices)
 	assert.Equal(t, 1500.0, overview.AvgInvoiceValue)
+
+	// New
+	// Both seeded invoices default to "Draft", so paid_amount should be 0.
+	assert.Equal(t, 0.0, overview.PaidAmount)
+	// Both are Draft with no due_date, so they should count as pending.
+	assert.Equal(t, 3000.0, overview.PendingAmount)
+	// No overdue invoices.
+	assert.Equal(t, 0, overview.OverdueCount)
 }
 
 func TestAnalyticsOverviewEmptyState(t *testing.T) {
@@ -50,6 +58,11 @@ func TestAnalyticsOverviewEmptyState(t *testing.T) {
 	require.NoError(t, decodeJSON(rec.Body.Bytes(), &overview))
 	assert.Equal(t, 0.0, overview.TotalRevenue)
 	assert.Equal(t, 0, overview.TotalInvoices)
+
+	// New
+	assert.Equal(t, 0.0, overview.PaidAmount)
+	assert.Equal(t, 0.0, overview.PendingAmount)
+	assert.Equal(t, 0, overview.OverdueCount)
 }
 
 func TestAnalyticsRevenueByMonth(t *testing.T) {

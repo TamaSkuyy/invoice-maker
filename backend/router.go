@@ -368,6 +368,8 @@ func setupRouter() *gin.Engine {
 				return
 			}
 
+			input.Status = "Draft"
+
 			c.JSON(http.StatusCreated, input)
 		})
 
