@@ -157,10 +157,22 @@ func setupRouter() *gin.Engine {
 		// List all invoices for current user
 		api.GET("", func(c *gin.Context) {
 			userID, _ := c.Get("user_id")
+			statusFilter := c.DefaultQuery("status", "")
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 			defer cancel()
 
-			rows, err := db.Query(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), COALESCE(CAST(due_date AS TEXT), ''), tax_rate, total_amount, status, user_id, created_at, updated_at FROM invoices WHERE user_id = $1 ORDER BY created_at DESC", userID)
+			query := `SELECT id, client_name, client_id, CAST(date AS TEXT), COALESCE(CAST(due_date AS TEXT), ''), tax_rate, total_amount, status, user_id, created_at, updated_at FROM invoices WHERE user_id = $1`
+			args := []interface{}{userID}
+
+			if statusFilter == "Overdue" {
+				query += ` AND status NOT IN ('Paid','Cancelled') AND due_date < CURRENT_DATE`
+			} else if statusFilter != "" {
+				query += ` AND status = $2`
+				args = append(args, statusFilter)
+			}
+			query += ` ORDER BY created_at DESC`
+
+			rows, err := db.Query(ctx, query, args...)
 			if err != nil {
 				log.Printf("query error: %v", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch invoices"})
@@ -591,10 +603,10 @@ func setupRouter() *gin.Engine {
 		api.GET("/:id/history", handleStatusHistory)
 
 		// Record a payment
-		// api.POST("/:id/payments", handleRecordPayment)
+		api.POST("/:id/payments", handleRecordPayment)
 
 		// List payments for an invoice
-		// api.GET("/:id/payments", handleListPayments)
+		api.GET("/:id/payments", handleListPayments)
 	}
 
 		// Client management routes (protected)
