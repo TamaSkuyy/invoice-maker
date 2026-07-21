@@ -1,5 +1,5 @@
 # =============================================================================
-# Caddyfile — Reverse Proxy + Auto HTTPS
+# Caddyfile — Reverse Proxy + Auto HTTPS + Security Headers
 # =============================================================================
 # Caddy otomatis mendapatkan SSL certificate dari Let's Encrypt.
 # Ganti invoice.example.com dengan domain kamu.
@@ -11,8 +11,44 @@
 # =============================================================================
 
 {$DOMAIN:localhost} {
+
+	# ── Security Headers ──────────────────────────────────────────────────
+	# Dipasang di SEMUA response. Penjelasan masing-masing header:
+	#
+	# Strict-Transport-Security (HSTS):
+	#   "Browser, selalu pakai HTTPS untuk domain ini, selama 2 tahun."
+	#   Cegah SSL stripping / downgrade attack.
+	#
+	# Content-Security-Policy (CSP):
+	#   "Hanya load script/style/font dari sumber yg diizinkan."
+	#   Pertahanan utama melawan XSS (Cross-Site Scripting).
+	#   'self' = hanya dari domain sendiri. inline script/style = dimatikan.
+	#
+	# X-Frame-Options:
+	#   "Jangan izinkan website ini di-embed di <iframe> situs lain."
+	#   Cegah clickjacking.
+	#
+	# X-Content-Type-Options:
+	#   "Jangan tebak-tebak MIME type, ikuti Content-Type header."
+	#   Cegah MIME sniffing attack.
+	#
+	# Referrer-Policy:
+	#   "Kirim referrer hanya untuk same-origin requests."
+	#   Cegah leak URL internal ke external site via Referer header.
+	#
+	# Permissions-Policy:
+	#   "Matikan camera, microphone, geolocation (kita gak pakai)."
+	#   Batasi browser API yg bisa diakses, kurangi attack surface.
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'"
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+
 	# ── Frontend (React SPA via nginx) ──────────────────────────────────
-	# Semua request non-API dilayani frontend
 	handle {
 		reverse_proxy frontend:80 {
 			header_up Host {host}

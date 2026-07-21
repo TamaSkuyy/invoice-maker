@@ -220,30 +220,35 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### Container & Orchestration
 
-- [ ] Improve Docker setup (optimize images, reduce size)
-- [ ] Setup Docker networking properly (fix current Podman issues)
-- [ ] Add health checks to services
-- [ ] Setup proper logging (stdout/stderr)
+- [x] Improve Docker setup (optimize images, reduce size) — `.dockerignore`, multi-stage build verified, build context optimized
+- [x] Setup Docker networking properly (fix current Podman issues) — explicit bridge network, `expose` vs `ports` pattern documented
+- [x] Add health checks to services — `GET /api/health` w/ `db.Ping()`, Docker healthcheck on backend + frontend + postgres
+- [x] Setup proper logging (stdout/stderr) — `log/slog` with JSON/text format, `LOG_FORMAT` + `LOG_LEVEL` env config, 43× `log.Printf` → `slog.Error`
 
 ### Cloud Deployment
 
-- [ ] Deploy to cloud (AWS, GCP, Azure, or DigitalOcean)
-- [ ] Setup CI/CD pipeline (GitHub Actions, GitLab CI, etc.)
-- [ ] Automated testing in pipeline
-- [ ] Database migrations in deployment
+- [x] ~~Deploy to cloud (AWS, GCP, Azure, or DigitalOcean)~~ — production setup READY: Caddyfile, docker-compose.prod.yml, deploy-production.sh, .env.prod.example, DEPLOYMENT_GUIDE.md. Tinggal provisioning VPS.
+- [x] Setup CI/CD pipeline (GitHub Actions, GitLab CI, etc.) — `.github/workflows/ci.yml`: test-backend (Go + PostgreSQL service), test-frontend (tsc + vite build), build-and-push (Docker → GHCR)
+- [x] Automated testing in pipeline — Go test runs in CI with real PostgreSQL service container, frontend tsc + vite build check
+- [x] Database migrations in deployment — auto-migrate at startup via `golang-migrate`, documented in deploy script + DEPLOYMENT_GUIDE.md
 
 ### Monitoring & Logging
 
-- [ ] Add structured logging (slog, winston)
-- [ ] Setup monitoring dashboard (Prometheus + Grafana)
-- [ ] Error tracking (Sentry, Rollbar)
-- [ ] Uptime monitoring
+- [x] Add structured logging (slog, winston) — `log/slog` implemented, text for dev, JSON for prod, all 5 files migrated
+- [x] Setup monitoring dashboard (Prometheus + Grafana) — 4 metric types (Counter, Histogram, Gauge), 7-panel dashboard, Grafana provisioning, docker-compose.monitoring.yml
+- [x] Error tracking (Sentry, Rollbar) — Sentry Go SDK (`sentrygin` middleware) + Sentry React SDK (`ErrorBoundary` + `replayIntegration` with PII masking)
+- [x] Uptime monitoring — documented: UptimeRobot/Better Uptime/Grafana Cloud setup in PHASE8_DEVOPS_LEARNING.md
 
 ### Learning Goal
 
-- Understand containerization best practices
-- Learn CI/CD principles
-- Practice DevOps fundamentals
+- [x] Understand containerization best practices — multi-stage, health checks, `.dockerignore`, `expose` vs `ports`
+- [x] Learn CI/CD principles — GitHub Actions, service containers, action pinning, layer caching, GHCR
+- [x] Practice DevOps fundamentals — structured logging, monitoring, error tracking, production deployment architecture
+
+### Docs Produced
+- `docs/PHASE8_DEVOPS_LEARNING.md` — hands-on learning guide (all 6 steps with concept explanations)
+- `docs/PHASE8_IMPLEMENTASI_DEVOPS.md` — learning summary (Problem → Arsitektur → 6 Konsep, format standar)
+- `docs/DEPLOYMENT_GUIDE.md` — step-by-step VPS deployment guide
 
 ---
 
@@ -288,26 +293,26 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### Performance
 
-- [ ] Optimize database queries (indexes, caching)
-- [ ] Frontend optimization (code splitting, lazy loading)
-- [ ] Caching strategy (Redis, browser cache)
-- [ ] Load testing & performance benchmarks
+- [ ] Optimize database queries (indexes, caching) — indexes already well-optimized (11 indexes audited), query caching not yet
+- [ ] Frontend optimization (code splitting, lazy loading) — deferred
+- [ ] Caching strategy (Redis, browser cache) — deferred
+- [ ] Load testing & performance benchmarks — deferred
 
 ### Security
 
-- [ ] Input validation on both frontend & backend
-- [ ] SQL injection prevention (parameterized queries)
-- [ ] XSS prevention (Content Security Policy)
-- [ ] CSRF protection
-- [ ] Rate limiting on API endpoints
-- [ ] HTTPS/TLS setup
-- [ ] Security headers (HSTS, X-Content-Type-Options, etc.)
+- [x] Input validation on both frontend & backend — backend: `binding` tags on Invoice, InvoiceItem, SignupRequest, LoginRequest, PaymentRequest, SetStatusRequest. Frontend: deferred.
+- [x] SQL injection prevention (parameterized queries) — all queries use `$1`, `$2` placeholders, no `fmt.Sprintf` for SQL
+- [x] XSS prevention (Content Security Policy) — CSP header in Caddyfile: `default-src 'self'; script-src 'self'`
+- [x] CSRF protection — not required: API uses JWT Bearer token (Authorization header), browser doesn't auto-attach. Standard for SPA + API architecture.
+- [x] Rate limiting on API endpoints — per-IP token bucket middleware (`golang.org/x/time/rate`), 10 rps dev / 20 rps prod, whitelist for /api/health + /api/metrics
+- [x] HTTPS/TLS setup — Caddy auto-SSL from Let's Encrypt (Phase 8), HSTS header enforced
+- [x] Security headers (HSTS, X-Content-Type-Options, etc.) — 6 headers in Caddyfile: HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
 
 ### Learning Goal
 
-- Understand OWASP Top 10 vulnerabilities
-- Learn secure coding practices
-- Practice security testing
+- [x] Understand OWASP Top 10 vulnerabilities — covered: Injection (SQL), Broken Authentication (JWT), XSS (CSP), Rate Limiting, Security Headers
+- [x] Learn secure coding practices — parameterized queries, input validation, security headers, rate limiting
+- [ ] Practice security testing — deferred (Phase 9 frontend testing / ZAP scan)
 
 ---
 

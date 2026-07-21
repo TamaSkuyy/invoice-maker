@@ -20,20 +20,20 @@ import (
 
 // InvoiceItem represents a single line item in an invoice.
 type InvoiceItem struct {
-	Description string  `json:"description"`
-	Qty         float64 `json:"qty"`
-	Price       float64 `json:"price"`
+	Description string  `json:"description" binding:"required,min=1"`
+	Qty         float64 `json:"qty" binding:"required,gt=0"`
+	Price       float64 `json:"price" binding:"required,gte=0"`
 }
 
 // Invoice represents the full invoice document.
 type Invoice struct {
 	ID          string        `json:"id"`
-	ClientName  string        `json:"client_name"`
+	ClientName  string        `json:"client_name" binding:"required,min=1"`
 	ClientID    *string       `json:"client_id"`
-	Date        string        `json:"date"`
+	Date        string        `json:"date" binding:"required"`
 	DueDate     string        `json:"due_date"`
-	Items       []InvoiceItem `json:"items"`
-	TaxRate     float64       `json:"tax_rate"`
+	Items       []InvoiceItem `json:"items" binding:"required,min=1,dive"`
+	TaxRate     float64       `json:"tax_rate" binding:"gte=0"`
 	TotalAmount float64       `json:"total_amount"`
 	Status      string        `json:"status"`
 	UserID      string        `json:"user_id"`

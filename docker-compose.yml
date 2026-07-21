@@ -37,6 +37,8 @@ services:
       LOG_LEVEL: debug
       SENTRY_DSN: ""
       ENV: development
+      RATE_LIMIT_RPS: "20"
+      RATE_LIMIT_BURST: "40"
     depends_on:
       postgres:
         condition: service_healthy

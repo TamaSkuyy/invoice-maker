@@ -28,6 +28,11 @@ func setupRouter() *gin.Engine {
 		Repanic: true,
 	}))
 
+	// Rate limiting — cegah API abuse. Diterapkan ke semua route KECUALI
+	// /api/health (Docker healthcheck tiap 10s) dan /api/metrics (Prometheus
+	// scrape tiap 15s). Kalau limit tercapai → 429 Too Many Requests.
+	r.Use(RateLimitMiddleware())
+
 	// Prometheus metrics middleware — catat setiap request (latency + status).
 	// Harus dipasang SEBELUM route handler, SESUDAH gin.Default().
 	r.Use(MetricsMiddleware())
