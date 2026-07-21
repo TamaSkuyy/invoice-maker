@@ -8,5 +8,6 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"], // global test setup
     globals: true,                   // expect, describe, it tanpa import
     css: false,                      // skip CSS parsing (lebih cepat)
+    exclude: ["e2e/**", "node_modules/**"],  // E2E tests pakai Playwright, bukan Vitest
   },
 });

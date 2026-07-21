@@ -1,3 +1,22 @@
+// @title           Invoice Maker API
+// @version         1.0
+// @description     Full-featured invoice management REST API.
+// @description     Create, manage, and export invoices with payment tracking and analytics.
+//
+// @contact.name    API Support
+// @contact.email   support@invoice-maker.local
+//
+// @license.name    MIT
+// @license.url     https://opensource.org/licenses/MIT
+//
+// @host            localhost:8080
+// @BasePath        /api
+//
+// @securityDefinitions.apikey BearerAuth
+// @in              header
+// @name            Authorization
+// @description     JWT Bearer token. Format: "Bearer <token>"
+
 package main
 
 import (

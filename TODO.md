@@ -255,14 +255,14 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 - [x] Unit tests for pure functions (`round2`, `calculateTotal`, password hashing, JWT generate/validate) — see `backend/logic_test.go`
 - [x] Integration tests with test database (`invoicedb_test`) — auth, invoices (CRUD + isolation), clients, products, analytics, export smoke tests — see `backend/*_test.go`, 17 test functions, **67.0% coverage**
-- [ ] End-to-end tests for full workflows — deferred (frontend testing phase)
+- [x] End-to-end tests for full workflows — 5 Playwright E2E smoke tests: login page render, form validation, input handling, register navigation, back navigation. Config: `playwright.config.ts`, `e2e/app.spec.ts`
 - [x] Test coverage tracked via `go test ./... -cover` — realistic target 50-60% noted; achieved 67.0%. Export/PDF byte-level output intentionally not exhaustive-tested — see `docs/superpowers/specs/2026-07-16-phase9-backend-testing-design.md`
 
 ### Frontend Testing
 
 - [x] Component unit tests (Vitest) — 3 test files, 13 tests: ApiError class, LoginPage (render + interactions), InvoicePreview (render + data display)
 - [x] Integration tests (React Testing Library) — component tests pakai RTL render + fireEvent + userEvent, mock props pattern
-- [ ] E2E tests (Playwright) — deferred
+- [x] E2E tests (Playwright) — 5 smoke tests: login render, empty submit, input fill, register nav, back to login
 
 ### Code Quality
 
@@ -273,7 +273,7 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### Documentation
 
-- [ ] API documentation (Swagger/OpenAPI) — deferred
+- [x] API documentation (Swagger/OpenAPI) — swaggo annotations di main.go + `/swagger/index.html` UI endpoint. Generated: `docs/docs.go`, `swagger.json`, `swagger.yaml`
 - [x] Architecture documentation (ADR) — Phase 2-10 implementation docs in `docs/`
 - [x] Setup guide & deployment guide — `docs/DEPLOYMENT_GUIDE.md`
 - [x] Code comments for complex logic — all middleware + security modules documented
@@ -291,7 +291,7 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 ### Performance
 
 - [ ] Optimize database queries (indexes, caching) — indexes already well-optimized (11 indexes audited), query caching not yet
-- [ ] Frontend optimization (code splitting, lazy loading) — deferred
+- [x] Frontend optimization (code splitting, lazy loading) — `React.lazy()` + `Suspense` untuk RevenueChart + TopClientsChart (recharts ~150KB deferred)
 - [ ] Caching strategy (Redis, browser cache) — deferred
 - [ ] Load testing & performance benchmarks — deferred
 

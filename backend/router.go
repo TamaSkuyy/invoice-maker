@@ -11,6 +11,10 @@ import (
 	"github.com/google/uuid"
 
 	sentrygin "github.com/getsentry/sentry-go/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+
+	_ "github.com/TamaSkuyy/invoice-maker/backend/docs"
 )
 
 // setupRouter builds the full Gin router. It relies on the package-level
@@ -868,6 +872,9 @@ func setupRouter() *gin.Engine {
 				c.JSON(http.StatusOK, gin.H{"message": "product deleted"})
 			})
 		}
+
+	// Swagger UI — serves the auto-generated API documentation.
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Prometheus metrics endpoint — no auth required.
 	// Di-scrape oleh Prometheus setiap 15 detik untuk mengumpulkan data

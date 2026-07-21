@@ -3,8 +3,27 @@ import { Navbar } from "./Navbar";
 import InvoiceForm from "./InvoiceForm";
 import InvoicePreview from "./InvoicePreview";
 import { DashboardCards } from "./DashboardCards";
-import { RevenueChart } from "./RevenueChart";
-import { TopClientsChart } from "./TopClientsChart";
+import { lazy, Suspense } from "react";
+
+// Lazy-load chart components — `recharts` is a heavy dependency (~150KB gzip).
+// User yang cuma bikin invoice (tanpa buka Analytics tab) gak perlu download recharts.
+const RevenueChart = lazy(() =>
+  import("./RevenueChart").then((m) => ({ default: m.RevenueChart })),
+);
+const TopClientsChart = lazy(() =>
+  import("./TopClientsChart").then((m) => ({ default: m.TopClientsChart })),
+);
+
+// Chart skeleton — ditampilkan saat chart component lagi di-load.
+function ChartSkeleton() {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="h-64 flex items-center justify-center">
+        <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full" />
+      </div>
+    </div>
+  );
+}
 import { TaxSummaryCard } from "./TaxSummaryCard";
 import { apiFetch } from "../utils/api";
 import { downloadFile } from "../utils/export";
@@ -161,13 +180,17 @@ export function ProtectedInvoiceDashboard({
           <DashboardCards data={overview} loading={analyticsLoading} />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <RevenueChart
-              data={revenue}
-              loading={analyticsLoading}
-              year={selectedYear}
-              onYearChange={setSelectedYear}
-            />
-            <TopClientsChart data={topClients} loading={analyticsLoading} />
+            <Suspense fallback={<ChartSkeleton />}>
+              <RevenueChart
+                data={revenue}
+                loading={analyticsLoading}
+                year={selectedYear}
+                onYearChange={setSelectedYear}
+              />
+            </Suspense>
+            <Suspense fallback={<ChartSkeleton />}>
+              <TopClientsChart data={topClients} loading={analyticsLoading} />
+            </Suspense>
           </div>
 
           <TaxSummaryCard data={taxSummary} loading={analyticsLoading} year={selectedYear} />

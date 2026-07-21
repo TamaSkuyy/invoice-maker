@@ -1,0 +1,22 @@
+basePath: /api
+host: localhost:8080
+info:
+  contact:
+    email: support@invoice-maker.local
+    name: API Support
+  description: |-
+    Full-featured invoice management REST API.
+    Create, manage, and export invoices with payment tracking and analytics.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: Invoice Maker API
+  version: "1.0"
+paths: {}
+securityDefinitions:
+  BearerAuth:
+    description: 'JWT Bearer token. Format: "Bearer <token>"'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
