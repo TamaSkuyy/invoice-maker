@@ -63,7 +63,7 @@ export function RevenueChart({ data, loading, year, onYearChange }: RevenueChart
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
             <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#6b7280" }} />
             <YAxis tickFormatter={formatTick} tick={{ fontSize: 12, fill: "#6b7280" }} />
-            <Tooltip formatter={(value) => [formatTooltip(Number(value)), "Revenue"]} />
+            <Tooltip formatter={(value: number) => [formatTooltip(Number(value)), "Revenue"]} />
             <Bar dataKey="total" fill="#2563eb" radius={[4, 4, 0, 0]} maxBarSize={40} />
           </BarChart>
         </ResponsiveContainer>

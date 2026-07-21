@@ -120,9 +120,11 @@ jobs:
         with:
           bun-version: "1.1"
 
+      # TODO: generate bun.lockb (jalankan `bun install` di lokal, commit lockfile-nya)
+      # lalu ganti jadi `bun install --frozen-lockfile` untuk reproducible builds.
       - name: Install dependencies
         working-directory: frontend
-        run: bun install --frozen-lockfile
+        run: bun install
 
       # TypeScript type-check (tanpa emit file)
       # Ini "compiler check" — memastikan tidak ada type error

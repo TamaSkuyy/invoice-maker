@@ -57,7 +57,7 @@ export function TopClientsChart({ data, loading }: TopClientsChartProps) {
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(value) => [formatTooltip(Number(value)), "Revenue"]} />
+            <Tooltip formatter={(value: number) => [formatTooltip(Number(value)), "Revenue"]} />
             <Legend
               formatter={(value: string) => truncateName(value, 14)}
               wrapperStyle={{ fontSize: 12 }}
