@@ -1,13 +1,48 @@
+# =============================================================================
+# Production Docker Compose — Invoice Maker
+# =============================================================================
+# Usage:
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+#
+# Services:
+#   Caddy (:80/:443) → frontend (internal :80) + backend (internal :8080)
+#   PostgreSQL (internal only, kecuali explicit expose)
+# =============================================================================
+
 services:
+  # ── Reverse Proxy + Auto SSL ────────────────────────────────────────────
+  caddy:
+    image: docker.io/library/caddy:2-alpine
+    container_name: invoice-caddy-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN harus diset di .env.prod}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ | grep -q '<!DOCTYPE\\|<html'"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── Database ────────────────────────────────────────────────────────────
   postgres:
     image: docker.io/library/postgres:16-alpine
     container_name: invoice-postgres-prod
     environment:
       POSTGRES_USER: ${DB_USER:-invoiceuser}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-invoicepassword}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD harus diset di .env.prod}
       POSTGRES_DB: ${DB_NAME:-invoicedb}
-    ports:
-      - "5432:5432"
+    # PostgreSQL TIDAK di-expose ke internet. Hanya bisa diakses dari
+    # dalam Docker network. Kalau perlu akses remote, buka port via SSH tunnel:
+    #   ssh -L 5432:localhost:5432 user@vps
+    expose:
+      - "5432"
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
     healthcheck:
@@ -17,18 +52,21 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # ── Backend API ─────────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: invoice-backend-prod
-    ports:
-      - "${BACKEND_PORT:-8080}:8080"
+    # Port TIDAK di-expose ke host — hanya diakses oleh Caddy via
+    # Docker internal network (service name "backend" resolve ke container).
+    expose:
+      - "8080"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: ${DB_USER:-invoiceuser}
-      DB_PASSWORD: ${DB_PASSWORD:-invoicepassword}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD harus diset di .env.prod}
       DB_NAME: ${DB_NAME:-invoicedb}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET harus diset di .env.prod}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-900}
@@ -48,15 +86,17 @@ services:
       retries: 3
       start_period: 15s
 
+  # ── Frontend (SPA via nginx) ────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: invoice-frontend-prod
-    ports:
-      - "${FRONTEND_PORT:-3000}:80"
+    expose:
+      - "80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:80/ | grep -q '<!DOCTYPE\\|<div id=\"root\"'"]
@@ -67,3 +107,5 @@ services:
 
 volumes:
   postgres_prod_data:
+  caddy_data:
+  caddy_config:

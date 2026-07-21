@@ -79,29 +79,32 @@ check_env() {
   if [ ! -f "${ENV_FILE}" ]; then
     err "File ${ENV_FILE} tidak ditemukan!"
     echo ""
-    echo "Buat file .env.prod dengan isi:"
-    echo "  DB_USER=invoiceuser"
-    echo "  DB_PASSWORD=<password-kuat>"
-    echo "  DB_NAME=invoicedb"
-    echo "  JWT_SECRET=<random-min-32-characters>"
-    echo "  JWT_EXPIRATION=900"
-    echo "  BACKEND_PORT=8080"
-    echo "  FRONTEND_PORT=3000"
+    echo "Copy template dan isi:"
+    echo "  cp .env.prod.example .env.prod"
+    echo "  nano .env.prod"
     exit 1
   fi
 
   source "${ENV_FILE}"
 
-  if [ -z "${JWT_SECRET:-}" ] || [ "${#JWT_SECRET}" -lt 32 ]; then
-    err "JWT_SECRET di .env.prod harus diisi minimal 32 karakter!"
+  if [ -z "${DOMAIN:-}" ]; then
+    err "DOMAIN di .env.prod harus diisi! Contoh: DOMAIN=invoice.example.com"
     exit 1
   fi
 
-  if [ -z "${DB_PASSWORD:-}" ] || [ "$DB_PASSWORD" = "invoicepassword" ]; then
-    warn "DB_PASSWORD masih default! Ganti dengan password yang kuat di ${ENV_FILE}"
+  if [ -z "${JWT_SECRET:-}" ] || [ "${#JWT_SECRET}" -lt 32 ]; then
+    err "JWT_SECRET di .env.prod harus diisi minimal 32 karakter!"
+    echo "  Generate: openssl rand -base64 64"
+    exit 1
+  fi
+
+  if [ -z "${DB_PASSWORD:-}" ] || [ "$DB_PASSWORD" = "invoicepassword" ] || [ "$DB_PASSWORD" = "GANTI_DENGAN_PASSWORD_KUAT_MIN_20_CHAR" ]; then
+    err "DB_PASSWORD di .env.prod harus diisi dengan password yang kuat!"
+    exit 1
   fi
 
   log "Environment file: ${ENV_FILE} OK"
+  log "Domain: ${DOMAIN}"
 }
 
 # ── Stop ──────────────────────────────────────────────────────────────────
@@ -209,17 +212,14 @@ done
 echo
 
 # ── Summary ───────────────────────────────────────────────────────────────
-BACKEND_PORT="${BACKEND_PORT:-8080}"
-FRONTEND_PORT="${FRONTEND_PORT:-3000}"
-
 echo
 echo -e "${CYAN}========================================${NC}"
 success "Deployment selesai!"
 echo -e "${CYAN}========================================${NC}"
 echo
-echo -e "  Frontend  : ${GREEN}http://SERVER_IP:${FRONTEND_PORT}${NC}"
-echo -e "  Backend   : ${GREEN}http://SERVER_IP:${BACKEND_PORT}${NC}"
-echo -e "  Database  : ${GREEN}postgres:5432${NC}"
+echo -e "  Aplikasi  : ${GREEN}https://${DOMAIN}${NC}"
+echo -e "  API       : ${GREEN}https://${DOMAIN}/api${NC}"
+echo -e "  Health    : ${GREEN}https://${DOMAIN}/api/health${NC}"
 echo
 echo "  Perintah berguna:"
 echo "    Logs    : ./deploy-production.sh --logs"

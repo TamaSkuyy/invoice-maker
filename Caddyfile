@@ -1,0 +1,36 @@
+# =============================================================================
+# Caddyfile — Reverse Proxy + Auto HTTPS
+# =============================================================================
+# Caddy otomatis mendapatkan SSL certificate dari Let's Encrypt.
+# Ganti invoice.example.com dengan domain kamu.
+#
+# Setup domain:
+#   1. Beli domain (atau pakai gratis: duckdns.org, nip.io)
+#   2. Arahkan DNS A record ke IP VPS kamu
+#   3. Pastikan port 80 & 443 terbuka di firewall VPS
+# =============================================================================
+
+{$DOMAIN:localhost} {
+	# ── Frontend (React SPA via nginx) ──────────────────────────────────
+	# Semua request non-API dilayani frontend
+	handle {
+		reverse_proxy frontend:80 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# ── Backend API ─────────────────────────────────────────────────────
+	handle_path /api/* {
+		reverse_proxy backend:8080 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# ── Logging ─────────────────────────────────────────────────────────
+	log {
+		output stdout
+		format json
+	}
+}
