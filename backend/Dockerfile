@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     bash \
     postgresql-client \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy go mod files

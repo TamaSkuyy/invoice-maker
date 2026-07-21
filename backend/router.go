@@ -849,6 +849,29 @@ func setupRouter() *gin.Engine {
 			})
 		}
 
+	// Health check endpoint — no auth required.
+	// Used by Docker healthcheck, Prometheus, and uptime monitors.
+	// Verifies the database connection is alive, not just that the HTTP
+	// server is listening.
+	r.GET("/api/health", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+
+		// Ping the database — a real health check, not just "return 200".
+		if err := db.Ping(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status": "unhealthy",
+				"db":     "unreachable",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"status": "healthy",
+			"time":   time.Now().UTC().Format(time.RFC3339),
+		})
+	})
+
 		// Analytics routes (protected)
 		analytics := r.Group("/api/analytics")
 		analytics.Use(authenticate())

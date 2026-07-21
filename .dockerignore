@@ -1,0 +1,46 @@
+# Dependencies (di-install ulang di dalam container)
+**/node_modules
+**/vendor
+
+# Build output (di-generate ulang di dalam container)
+frontend/dist
+backend/server
+
+# Git — tidak diperlukan untuk build
+.git
+.gitignore
+.gitattributes
+
+# IDE & Editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation & plans (tidak dipakai saat build)
+*.md
+docs/
+.superpowers/
+.claude/
+
+# Environment files (credentials, jangan sampai masuk image!)
+.env
+.env.*
+!.env.example
+
+# Test files & coverage (tidak diperlukan di production image)
+*_test.go
+**/coverage.out
+**/coverage.html
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
