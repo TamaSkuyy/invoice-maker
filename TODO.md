@@ -263,29 +263,29 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### Frontend Testing
 
-- [ ] Component unit tests (Vitest/Jest)
-- [ ] Integration tests (React Testing Library)
-- [ ] E2E tests (Cypress/Playwright)
+- [x] Component unit tests (Vitest) — 3 test files, 13 tests: ApiError class, LoginPage (render + interactions), InvoicePreview (render + data display)
+- [x] Integration tests (React Testing Library) — component tests pakai RTL render + fireEvent + userEvent, mock props pattern
+- [ ] E2E tests (Playwright) — deferred
 
 ### Code Quality
 
-- [ ] Setup linting (ESLint, Prettier)
-- [ ] Code formatting standards
-- [ ] Pre-commit hooks
-- [ ] Code review process
+- [x] Setup linting (ESLint, Prettier) — `eslint.config.js` (flat config) + `.prettierrc`, scripts: `lint`, `lint:fix`, `format`, `format:check`
+- [x] Code formatting standards — Prettier: 2-space tab, semicolons, trailing commas, 100 char width
+- [x] Pre-commit hooks — `lint-staged`: auto ESLint --fix + Prettier --write on staged `.ts/.tsx` files
+- [ ] Code review process — deferred (team practice)
 
 ### Documentation
 
-- [ ] API documentation (Swagger/OpenAPI)
-- [ ] Architecture documentation (ADR)
-- [ ] Setup guide & deployment guide
-- [ ] Code comments for complex logic
+- [ ] API documentation (Swagger/OpenAPI) — deferred
+- [x] Architecture documentation (ADR) — Phase 2-10 implementation docs in `docs/`
+- [x] Setup guide & deployment guide — `docs/DEPLOYMENT_GUIDE.md`
+- [x] Code comments for complex logic — all middleware + security modules documented
 
 ### Learning Goal
 
-- Understand testing strategies & best practices — ✅ table-driven tests, httptest, integration w/ real Postgres, `TestMain`, test isolation (TRUNCATE), multi-user isolation, SQL aggregation verification, smoke tests for binary output. Pattern-to-concept mapping documented in `docs/superpowers/plans/2026-07-16-phase9-backend-testing.md`.
-- Learn TDD approach
-- Practice code quality standards
+- [x] Understand testing strategies & best practices — ✅ table-driven tests, httptest, integration w/ real Postgres, `TestMain`, test isolation (TRUNCATE), multi-user isolation, SQL aggregation verification, smoke tests for binary output, **Vitest + React Testing Library component tests**
+- [x] Learn TDD approach — frontend: write test first (ApiError), then component tests with mock props
+- [x] Practice code quality standards — ESLint flat config, Prettier, lint-staged, CI integration
 
 ---
 

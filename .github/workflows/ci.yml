@@ -132,6 +132,19 @@ jobs:
         working-directory: frontend
         run: bun x tsc --noEmit
 
+      # Linting — ESLint (non-blocking warning) + Prettier format check
+      - name: Lint & Format check
+        working-directory: frontend
+        continue-on-error: true
+        run: |
+          bun x eslint src/ || echo "::warning ::ESLint issues found — fix with 'npm run lint:fix'"
+          bun x prettier --check src/ || echo "::warning ::Format issues found — fix with 'npm run format'"
+
+      # Unit + component tests (Vitest + React Testing Library)
+      - name: Run tests
+        working-directory: frontend
+        run: bun x vitest run
+
       # Build production bundle — memastikan build tidak error
       - name: Vite build
         working-directory: frontend
