@@ -32,6 +32,8 @@ services:
       DB_NAME: ${DB_NAME:-invoicedb}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET harus diset di .env.prod}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-900}
+      LOG_FORMAT: json
+      LOG_LEVEL: info
     depends_on:
       postgres:
         condition: service_healthy

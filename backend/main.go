@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"net/http"
 	"os"
@@ -270,15 +270,21 @@ func runMigrations() error {
 }
 
 func main() {
+	// Structured logging — reads LOG_FORMAT and LOG_LEVEL from env.
+	// JSON in production, human-readable text in development.
+	initLogger()
+
 	// Initialize database
 	if err := initDB(); err != nil {
-		log.Fatalf("failed to initialize database: %v", err)
+		slog.Error("failed to initialize database", "error", err)
+		os.Exit(1)
 	}
 	defer closeDB()
 
 	// Run migrations
 	if err := runMigrations(); err != nil {
-		log.Fatalf("failed to run migrations: %v", err)
+		slog.Error("failed to run migrations", "error", err)
+		os.Exit(1)
 	}
 
 	r := setupRouter()

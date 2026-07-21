@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -92,7 +92,7 @@ func handleAnalyticsOverview(c *gin.Context) {
     	&o.PaidAmount, &o.PendingAmount, &o.OverdueCount,
 	)
 	if err != nil {
-		log.Printf("analytics overview error: %v", err)
+		slog.Error("analytics overview error", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch analytics"})
 		return
 	}
@@ -121,7 +121,7 @@ func handleAnalyticsRevenue(c *gin.Context) {
 		ORDER BY month
 	`, userID, year)
 	if err != nil {
-		log.Printf("analytics revenue error: %v", err)
+		slog.Error("analytics revenue error", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch revenue data"})
 		return
 	}
@@ -132,7 +132,7 @@ func handleAnalyticsRevenue(c *gin.Context) {
 		var d RevenueDataPoint
 		var month float64
 		if err := rows.Scan(&d.Label, &month, &d.Total, &d.Count); err != nil {
-			log.Printf("scan revenue error: %v", err)
+			slog.Error("scan revenue error", "error", err)
 			continue
 		}
 		d.Total = round2(d.Total)
@@ -170,7 +170,7 @@ func handleAnalyticsTopClients(c *gin.Context) {
 		LIMIT $2
 	`, userID, limit)
 	if err != nil {
-		log.Printf("analytics top-clients error: %v", err)
+		slog.Error("analytics top-clients error", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch top clients"})
 		return
 	}
@@ -180,7 +180,7 @@ func handleAnalyticsTopClients(c *gin.Context) {
 	for rows.Next() {
 		var d TopClientData
 		if err := rows.Scan(&d.ClientName, &d.Total, &d.Count); err != nil {
-			log.Printf("scan top-clients error: %v", err)
+			slog.Error("scan top-clients error", "error", err)
 			continue
 		}
 		d.Total = round2(d.Total)
@@ -213,7 +213,7 @@ func handleAnalyticsTaxSummary(c *gin.Context) {
 		ORDER BY month
 	`, userID, year)
 	if err != nil {
-		log.Printf("analytics tax-summary error: %v", err)
+		slog.Error("analytics tax-summary error", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch tax summary"})
 		return
 	}
@@ -224,7 +224,7 @@ func handleAnalyticsTaxSummary(c *gin.Context) {
 		var d TaxDataPoint
 		var month float64
 		if err := rows.Scan(&d.Label, &month, &d.Tax, &d.Revenue); err != nil {
-			log.Printf("scan tax-summary error: %v", err)
+			slog.Error("scan tax-summary error", "error", err)
 			continue
 		}
 		d.Tax = round2(d.Tax)
@@ -299,7 +299,7 @@ func handleAnalyticsReport(c *gin.Context) {
 	case "excel":
 		data, err := generateAnalyticsExcel(overview, revenue, taxData, year)
 		if err != nil {
-			log.Printf("analytics excel error: %v", err)
+			slog.Error("analytics excel error", "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate report"})
 			return
 		}
@@ -309,7 +309,7 @@ func handleAnalyticsReport(c *gin.Context) {
 	default:
 		data, err := generateAnalyticsPDF(overview, revenue, taxData, year)
 		if err != nil {
-			log.Printf("analytics pdf error: %v", err)
+			slog.Error("analytics pdf error", "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate report"})
 			return
 		}

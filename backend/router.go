@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -66,7 +66,7 @@ func setupRouter() *gin.Engine {
 				userID, req.Email, hash, now, now,
 			)
 			if err != nil {
-				log.Printf("insert user error: %v", err)
+				slog.Error("insert user error", "error", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 				return
 			}
@@ -174,7 +174,7 @@ func setupRouter() *gin.Engine {
 
 			rows, err := db.Query(ctx, query, args...)
 			if err != nil {
-				log.Printf("query error: %v", err)
+				slog.Error("query error", "error", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch invoices"})
 				return
 			}
@@ -184,7 +184,7 @@ func setupRouter() *gin.Engine {
 			for rows.Next() {
 				var inv Invoice
 				if err := rows.Scan(&inv.ID, &inv.ClientName, &inv.ClientID, &inv.Date, &inv.DueDate, &inv.TaxRate, &inv.TotalAmount, &inv.Status, &inv.UserID, &inv.CreatedAt, &inv.UpdatedAt); err != nil {
-					log.Printf("scan error: %v", err)
+					slog.Error("scan error", "error", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse invoices"})
 					return
 				}
@@ -192,7 +192,7 @@ func setupRouter() *gin.Engine {
 				// Fetch invoice items
 				itemRows, err := db.Query(ctx, "SELECT description, qty, price FROM invoice_items WHERE invoice_id = $1 ORDER BY created_at", inv.ID)
 				if err != nil {
-					log.Printf("query items error: %v", err)
+					slog.Error("query items error", "error", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch invoice items"})
 					return
 				}
@@ -201,7 +201,7 @@ func setupRouter() *gin.Engine {
 				for itemRows.Next() {
 					var item InvoiceItem
 					if err := itemRows.Scan(&item.Description, &item.Qty, &item.Price); err != nil {
-						log.Printf("scan item error: %v", err)
+						slog.Error("scan item error", "error", err)
 						itemRows.Close()
 						c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse invoice items"})
 						return
@@ -253,7 +253,7 @@ func setupRouter() *gin.Engine {
 
 			data, err := generateInvoicesExcel(invoices)
 			if err != nil {
-				log.Printf("excel generation error: %v", err)
+				slog.Error("excel generation error", "error", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate Excel"})
 				return
 			}
@@ -281,7 +281,7 @@ func setupRouter() *gin.Engine {
 			// Fetch invoice items
 			itemRows, err := db.Query(ctx, "SELECT description, qty, price FROM invoice_items WHERE invoice_id = $1 ORDER BY created_at", id)
 			if err != nil {
-				log.Printf("query items error: %v", err)
+				slog.Error("query items error", "error", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch invoice items"})
 				return
 			}
@@ -291,7 +291,7 @@ func setupRouter() *gin.Engine {
 			for itemRows.Next() {
 				var item InvoiceItem
 				if err := itemRows.Scan(&item.Description, &item.Qty, &item.Price); err != nil {
-					log.Printf("scan item error: %v", err)
+					slog.Error("scan item error", "error", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse invoice items"})
 					return
 				}
@@ -326,7 +326,7 @@ func setupRouter() *gin.Engine {
 			// Start transaction
 			tx, err := db.Begin(ctx)
 			if err != nil {
-				log.Printf("transaction error: %v", err)
+				slog.Error("transaction error", "error", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create invoice"})
 				return
 			}
@@ -343,7 +343,7 @@ func setupRouter() *gin.Engine {
 				input.ID, input.ClientName, input.ClientID, input.Date, dueDate, input.TaxRate, input.TotalAmount, "Draft", input.UserID, input.CreatedAt, input.UpdatedAt,
 			)
 			if err != nil {
-				log.Printf("insert invoice error: %v", err)
+				slog.Error("insert invoice error", "error", err)
 				c.JSON(http.StatusBadRequest, gin.H{"error": "failed to create invoice"})
 				return
 			}
@@ -355,7 +355,7 @@ func setupRouter() *gin.Engine {
 					uuid.New().String(), input.ID, item.Description, item.Qty, item.Price,
 				)
 				if err != nil {
-					log.Printf("insert item error: %v", err)
+					slog.Error("insert item error", "error", err)
 					c.JSON(http.StatusBadRequest, gin.H{"error": "failed to create invoice items"})
 					return
 				}
@@ -363,7 +363,7 @@ func setupRouter() *gin.Engine {
 
 			// Commit transaction
 			if err := tx.Commit(ctx); err != nil {
-				log.Printf("commit error: %v", err)
+				slog.Error("commit error", "error", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create invoice"})
 				return
 			}
@@ -402,7 +402,7 @@ func setupRouter() *gin.Engine {
 			// Start transaction
 			tx, err := db.Begin(ctx)
 			if err != nil {
-				log.Printf("transaction error: %v", err)
+				slog.Error("transaction error", "error", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update invoice"})
 				return
 			}
@@ -419,7 +419,7 @@ func setupRouter() *gin.Engine {
 				input.ClientName, input.Date, dueDate, input.TaxRate, input.TotalAmount, input.UpdatedAt, id,
 			)
 			if err != nil {
-				log.Printf("update invoice error: %v", err)
+				slog.Error("update invoice error", "error", err)
 				c.JSON(http.StatusBadRequest, gin.H{"error": "failed to update invoice"})
 				return
 			}
@@ -427,7 +427,7 @@ func setupRouter() *gin.Engine {
 			// Delete old items
 			_, err = tx.Exec(ctx, "DELETE FROM invoice_items WHERE invoice_id = $1", id)
 			if err != nil {
-				log.Printf("delete items error: %v", err)
+				slog.Error("delete items error", "error", err)
 				c.JSON(http.StatusBadRequest, gin.H{"error": "failed to update invoice items"})
 				return
 			}
@@ -439,7 +439,7 @@ func setupRouter() *gin.Engine {
 					uuid.New().String(), id, item.Description, item.Qty, item.Price,
 				)
 				if err != nil {
-					log.Printf("insert item error: %v", err)
+					slog.Error("insert item error", "error", err)
 					c.JSON(http.StatusBadRequest, gin.H{"error": "failed to update invoice items"})
 					return
 				}
@@ -447,7 +447,7 @@ func setupRouter() *gin.Engine {
 
 			// Commit transaction
 			if err := tx.Commit(ctx); err != nil {
-				log.Printf("commit error: %v", err)
+				slog.Error("commit error", "error", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update invoice"})
 				return
 			}
@@ -457,7 +457,7 @@ func setupRouter() *gin.Engine {
 			err = db.QueryRow(ctx, "SELECT id, client_name, client_id, CAST(date AS TEXT), COALESCE(CAST(due_date AS TEXT), ''), tax_rate, total_amount, status, user_id, created_at, updated_at FROM invoices WHERE id = $1", id).
 				Scan(&updatedInv.ID, &updatedInv.ClientName, &updatedInv.ClientID, &updatedInv.Date, &updatedInv.DueDate, &updatedInv.TaxRate, &updatedInv.TotalAmount, &updatedInv.Status, &updatedInv.UserID, &updatedInv.CreatedAt, &updatedInv.UpdatedAt)
 			if err != nil {
-				log.Printf("fetch updated invoice error: %v", err)
+				slog.Error("fetch updated invoice error", "error", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch updated invoice"})
 				return
 			}
@@ -465,7 +465,7 @@ func setupRouter() *gin.Engine {
 			// Fetch items
 			itemRows, err := db.Query(ctx, "SELECT description, qty, price FROM invoice_items WHERE invoice_id = $1", id)
 			if err != nil {
-				log.Printf("query items error: %v", err)
+				slog.Error("query items error", "error", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch invoice items"})
 				return
 			}
@@ -475,7 +475,7 @@ func setupRouter() *gin.Engine {
 			for itemRows.Next() {
 				var item InvoiceItem
 				if err := itemRows.Scan(&item.Description, &item.Qty, &item.Price); err != nil {
-					log.Printf("scan item error: %v", err)
+					slog.Error("scan item error", "error", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse invoice items"})
 					return
 				}
@@ -504,7 +504,7 @@ func setupRouter() *gin.Engine {
 			// Delete invoice (cascade delete will handle items)
 			_, err = db.Exec(ctx, "DELETE FROM invoices WHERE id = $1", id)
 			if err != nil {
-				log.Printf("delete error: %v", err)
+				slog.Error("delete error", "error", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete invoice"})
 				return
 			}
@@ -545,7 +545,7 @@ func setupRouter() *gin.Engine {
 
 			pdfData, err := generateInvoicePDF(inv)
 			if err != nil {
-				log.Printf("pdf generation error: %v", err)
+				slog.Error("pdf generation error", "error", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate PDF"})
 				return
 			}
@@ -588,7 +588,7 @@ func setupRouter() *gin.Engine {
 
 			csvData, err := generateInvoiceCSV(inv)
 			if err != nil {
-				log.Printf("csv generation error: %v", err)
+				slog.Error("csv generation error", "error", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate CSV"})
 				return
 			}
@@ -664,7 +664,7 @@ func setupRouter() *gin.Engine {
 					input.ID, input.UserID, input.Name, input.Email, input.Phone, input.Address, input.CreatedAt, input.UpdatedAt,
 				)
 				if err != nil {
-					log.Printf("insert client error: %v", err)
+					slog.Error("insert client error", "error", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create client"})
 					return
 				}
@@ -696,7 +696,7 @@ func setupRouter() *gin.Engine {
 					input.Name, input.Email, input.Phone, input.Address, now, id, userID,
 				)
 				if err != nil {
-					log.Printf("update client error: %v", err)
+					slog.Error("update client error", "error", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update client"})
 					return
 				}
@@ -783,7 +783,7 @@ func setupRouter() *gin.Engine {
 					input.ID, input.UserID, input.Name, input.Description, input.DefaultPrice, input.CreatedAt, input.UpdatedAt,
 				)
 				if err != nil {
-					log.Printf("insert product error: %v", err)
+					slog.Error("insert product error", "error", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create product"})
 					return
 				}
@@ -815,7 +815,7 @@ func setupRouter() *gin.Engine {
 					input.Name, input.Description, input.DefaultPrice, now, id, userID,
 				)
 				if err != nil {
-					log.Printf("update product error: %v", err)
+					slog.Error("update product error", "error", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update product"})
 					return
 				}

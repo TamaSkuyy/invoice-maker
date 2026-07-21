@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -47,7 +47,7 @@ func handleRecordPayment(c *gin.Context) {
 	)
 
 	if err != nil {
-		log.Printf("insert payment error: %v", err)
+		slog.Error("insert payment error", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record payment"})
 		return
 	}
@@ -106,7 +106,7 @@ func handleListPayments(c *gin.Context) {
 	)
 
 	if err != nil {
-		log.Printf("query payments error: %v", err)
+		slog.Error("query payments error", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch payments"})
 		return
 	}
@@ -116,7 +116,7 @@ func handleListPayments(c *gin.Context) {
 	for rows.Next() {
 		var p Payment
 		if err := rows.Scan(&p.ID, &p.InvoiceID, &p.Amount, &p.Date, &p.Method, &p.RecordedBy, &p.CreatedAt); err != nil {
-			log.Printf("scan payment error: %v", err)
+			slog.Error("scan payment error", "error", err)
 			continue
 		}
 		payments = append(payments, p)

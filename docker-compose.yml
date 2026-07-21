@@ -33,6 +33,8 @@ services:
       DB_NAME: invoicedb
       JWT_SECRET: your-secret-key-change-in-production-min-32-chars
       JWT_EXPIRATION: 86400
+      LOG_FORMAT: text
+      LOG_LEVEL: debug
     depends_on:
       postgres:
         condition: service_healthy

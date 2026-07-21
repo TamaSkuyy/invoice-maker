@@ -232,6 +232,8 @@ export DB_PASSWORD="${DB_PASSWORD:-invoicepassword}"
 export DB_NAME="${DB_NAME:-invoicedb}"
 export JWT_SECRET="${JWT_SECRET:-dev-secret-key-do-not-use-in-production}"
 export JWT_EXPIRATION="${JWT_EXPIRATION:-86400}"
+export LOG_FORMAT="${LOG_FORMAT:-text}"
+export LOG_LEVEL="${LOG_LEVEL:-debug}"
 
 # ── Start backend ─────────────────────────────────────────────────────────
 log "Starting Go backend on http://localhost:8080 ..."

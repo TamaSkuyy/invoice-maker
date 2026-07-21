@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -77,14 +77,14 @@ func handleSetInvoiceStatus(c *gin.Context) {
 	now := time.Now()
 	_, err = db.Exec(ctx, `UPDATE invoices SET status = $1, updated_at = $2 WHERE id = $3`, req.Status, now, invoiceID,)
 	if err != nil {
-		log.Printf("update status error: %v", err)
+		slog.Error("update status error", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update status"})
 		return
 	}
 
 	// Record in history
 	if err := writeStatusHistory(ctx, invoiceID, currentStatus, req.Status, userID.(string)); err != nil {
-		log.Printf("write status history error: %v", err)
+		slog.Error("write status history error", "error", err)
 		// Non-fatal - status already updated, log the missing audit entry
 	}
 
@@ -112,7 +112,7 @@ func handleStatusHistory(c *gin.Context) {
 
 	rows, err := db.Query(ctx, `SELECT id, invoice_id, old_status, new_status, changed_by, changed_at FROM status_history WHERE invoice_id = $1 ORDER BY changed_at ASC`, invoiceID,)
 	if err != nil {
-		log.Printf("query status history error: %v", err)
+		slog.Error("query status history error", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch status history"})
 		return
 	}
@@ -122,7 +122,7 @@ func handleStatusHistory(c *gin.Context) {
 	for rows.Next() {
 		var h StatusHistoryEntry
 		if err := rows.Scan(&h.ID, &h.InvoiceID, &h.OldStatus, &h.NewStatus, &h.ChangedBy, &h.ChangedAt); err != nil {
-			log.Printf("scan history error: %v", err)
+			slog.Error("scan history error", "error", err)
 			continue
 		}
 		history = append(history, h)
