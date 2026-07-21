@@ -1,8 +1,8 @@
-# Phase 9: Backend Go Testing — Learning Summary
+# Phase 9: Testing & Code Quality — Learning Summary
 
-**Status**: ✅ SELESAI
-**Tanggal**: 16-20 Juli 2026
-**Scope**: Unit test + integration test backend Go (table-driven, httptest, testcontainers fallback ke dedicated DB, SQL aggregation verification)
+**Status**: ✅ SELESAI (Part 1: Backend + Part 2: Frontend)
+**Tanggal**: 16-21 Juli 2026
+**Scope**: Part 1 — Backend unit test + integration test Go (table-driven, httptest, dedicated DB). Part 2 — Frontend Vitest + React Testing Library, ESLint flat config, Prettier, lint-staged pre-commit hooks, CI integration.
 
 ---
 
@@ -567,5 +567,293 @@ Setelah Phase 9 selesai, yang bisa dikerjakan:
 
 ---
 
-**Phase 9 Selesai** ✅
-Testing backend Go siap jadi portfolio piece. Dari 0 test file ke 8 file, 17 fungsi, 67% coverage — dan satu bug production beneran ketauan & diperbaiki sepanjang jalan.
+**Part 1 (Backend) Selesai** ✅
+
+---
+
+## Part 2: Frontend Testing & Code Quality
+
+**Tanggal**: 21 Juli 2026  
+**Scope**: Vitest + React Testing Library setup, component smoke tests, ESLint flat config, Prettier, lint-staged pre-commit hooks, CI integration
+
+---
+
+### Problem: Frontend Tanpa Test & Tanpa Linter
+
+#### ❌ Sebelum Part 2
+
+```bash
+# package.json — cuma 3 script
+"scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+}
+
+# Testing: 0 file, 0 test
+# Linting: tidak ada ESLint, tidak ada Prettier
+# CI: cuma tsc --noEmit (type check doang)
+# Pre-commit: tidak ada
+```
+
+**Masalah:**
+1. **Gak ada test** — refactor komponen = gambling (gak tau ada yg rusak atau enggak)
+2. **Gak ada ESLint** — bug React (missing deps, setState in effect) gak kedetect
+3. **Gak ada formatter** — style code tidak konsisten antar developer
+4. **CI gak verifikasi** — cuma cek TypeScript types, gak cek apakah komponen bisa render
+
+#### ✅ Setelah Part 2
+
+```bash
+"scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint src/",              # ← BARU
+    "lint:fix": "eslint src/ --fix",    # ← BARU
+    "format": "prettier --write src/",  # ← BARU
+    "format:check": "prettier --check src/", # ← BARU
+    "test": "vitest run",               # ← BARU
+    "test:watch": "vitest"              # ← BARU
+}
+
+# Testing: 3 file, 13 test
+# CI: lint + test + type check + build
+# Pre-commit: lint-staged auto-fix
+```
+
+---
+
+### Arsitektur: Testing & Code Quality Pipeline
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│              FRONTEND QUALITY PIPELINE                        │
+│                                                               │
+│  [Kode Editor]                                                │
+│       │                                                       │
+│       ▼                                                       │
+│  ┌─────────────────────────────────────────────────────┐     │
+│  │ PRE-COMMIT (lint-staged)                             │     │
+│  │  *.ts,*.tsx → eslint --fix → prettier --write        │     │
+│  │  *.json,*.css,*.md → prettier --write                │     │
+│  └─────────────────────────────────────────────────────┘     │
+│       │                                                       │
+│       ▼                                                       │
+│  ┌─────────────────────────────────────────────────────┐     │
+│  │ CI PIPELINE (setiap push)                            │     │
+│  │  ├── ESLint check (non-blocking warning)             │     │
+│  │  ├── Prettier format check                           │     │
+│  │  ├── Vitest run (3 files, 13 tests)                  │     │
+│  │  ├── tsc --noEmit (type check)                       │     │
+│  │  └── vite build (production bundle)                  │     │
+│  └─────────────────────────────────────────────────────┘     │
+│                                                               │
+│  [Developer Experience]                                       │
+│  npm run test:watch  → auto re-run on file change            │
+│  npm run lint:fix    → auto-fix linting issues               │
+│  npm run format      → auto-format all files                 │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Konsep 1: ESLint Flat Config — Kenapa Bukan `.eslintrc`?
+
+ESLint v9+ pindah ke **flat config** (`eslint.config.js`). Format lama (`.eslintrc`) deprecated.
+
+#### ❌ Format Lama (`.eslintrc`)
+
+```json
+// .eslintrc.json — FORMAT LAMA, deprecated di ESLint v9
+{
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["react-hooks"],
+  "rules": {
+    "react-hooks/rules-of-hooks": "error"
+  }
+}
+```
+
+#### ✅ Flat Config (`eslint.config.js`)
+
+```js
+// eslint.config.js — FLAT CONFIG, ESLint v9+
+import js from "@eslint/js";
+import tseslint from "typescript-eslint";
+import reactHooks from "eslint-plugin-react-hooks";
+import prettierConfig from "eslint-config-prettier";
+
+export default tseslint.config(
+  js.configs.recommended,              // ESLint recommended
+  ...tseslint.configs.recommended,     // TypeScript rules
+  {
+    plugins: { "react-hooks": reactHooks },
+    rules: { ...reactHooks.configs.recommended.rules },
+  },
+  prettierConfig,                      // MUST be last — matikan ESLint rules yg konflik dgn Prettier
+  { ignores: ["dist/", "node_modules/"] },
+);
+```
+
+**Kenapa flat config?** Lebih eksplisit, composable (tinggal tambah/hapus config object), dan lebih cepat. `tseslint.config()` adalah helper dari `typescript-eslint` untuk membuat config yang type-safe.
+
+**Kenapa `prettierConfig` harus terakhir?** Config di-merge secara berurutan. Config terakhir menang. `eslint-config-prettier` matikan rules ESLint yang konflik dengan Prettier — kalau ditaruh di awal, rules ESLint lain bisa mengaktifkannya kembali.
+
+---
+
+### Konsep 2: Vitest — Kenapa Bukan Jest?
+
+| Aspek | Jest | Vitest |
+|-------|------|--------|
+| Config | `jest.config.js` terpisah | Pakai `vite.config.ts` yang sama |
+| Speed | Lebih lambat (transform manual) | Lebih cepat (ESBuild native) |
+| ESM support | Ribet (perlu transform) | Native (pakai Vite) |
+| TypeScript | Perlu `ts-jest` / `babel` | Native (pakai Vite) |
+| Watch mode | `jest --watch` | `vitest` (default watch) |
+| Compatibility | Mature, banyak plugin | Compatible dengan Jest API |
+
+```ts
+// vitest.config.ts — pakai Vite config yang sama dengan development!
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],          // ← plugin React yang sama dengan dev
+  test: {
+    environment: "jsdom",       // simulate browser
+    setupFiles: ["./src/test/setup.ts"],
+    globals: true,              // expect, describe, it tanpa import
+    css: false,                 // skip CSS = lebih cepat
+  },
+});
+```
+
+**Kenapa `environment: "jsdom"`?** Test component React butuh DOM API (`document.createElement`, `element.click()`). Node.js gak punya DOM — `jsdom` meng-emulasi DOM di Node.js sehingga `render(<LoginPage />)` bisa jalan.
+
+**Kenapa `globals: true`?** Tanpa ini, setiap file test harus import `describe`, `it`, `expect` dari `vitest`. Dengan `globals: true`, API Vitest tersedia global (seperti Jest). Lebih ergonomis — tapi perlu `"types": ["vitest/globals"]` di tsconfig supaya TypeScript gak error.
+
+**Kenapa `css: false`?** Component test gak butuh CSS. Skip parsing CSS = test ~30% lebih cepat. Visual regressions (kalau butuh) pakai Playwright/Storybook, bukan unit test.
+
+---
+
+### Konsep 3: Component Testing — Render + Interact + Assert
+
+#### Pattern: Testing Component dengan Props
+
+Komponen paling gampang di-test adalah yang **menerima semua behavior sebagai props** — tidak ada API call, tidak ada state management, tidak ada side effect.
+
+```tsx
+// LoginPage menerima SEMUA behavior sebagai props:
+interface LoginPageProps {
+  onLoginSuccess: () => void;           // callback → bisa di-mock
+  onNavigateToRegister: () => void;     // callback → bisa di-mock
+  login: (email: string, password: string) => Promise<void>; // async → bisa di-mock
+  loading: boolean;                     // state → dikontrol test
+  error: string | null;                 // state → dikontrol test
+}
+```
+
+Dengan pattern ini, test jadi **deterministik** — gak ada API call beneran, gak ada localStorage, gak ada state yg gak terkontrol.
+
+```tsx
+// LoginPage.test.tsx
+describe("LoginPage", () => {
+  // 1. Render test — paling dasar
+  it("should render login form", () => {
+    render(<LoginPage {...defaultProps} />);
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Login" })).toBeInTheDocument();
+  });
+
+  // 2. Interaction test — user ketik + klik
+  it("should call login with email and password", async () => {
+    const login = vi.fn().mockResolvedValue(undefined);
+    render(<LoginPage {...defaultProps} login={login} />);
+    
+    await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    fireEvent.click(screen.getByRole("button", { name: "Login" }));
+
+    expect(login).toHaveBeenCalledWith("test@example.com", "password123");
+  });
+
+  // 3. State test — loading = button disabled
+  it("should show loading state", () => {
+    render(<LoginPage {...defaultProps} loading={true} />);
+    expect(screen.getByRole("button", { name: "Logging in..." })).toBeDisabled();
+  });
+
+  // 4. Error test — tampilkan error message
+  it("should show server error", () => {
+    render(<LoginPage {...defaultProps} error="Invalid credentials" />);
+    expect(screen.getByText("Invalid credentials")).toBeInTheDocument();
+  });
+});
+```
+
+**Kenapa `vi.fn().mockResolvedValue(undefined)`?** `login` adalah async function. Kalau pakai `vi.fn()` biasa → return `undefined` → `await undefined` → crash. `mockResolvedValue` bikin mock function return Promise yang resolve ke `undefined`.
+
+**Kenapa `userEvent.type()` bukan `fireEvent.change()`?** `userEvent` mensimulasikan interaksi user asli: ketik karakter satu-per-satu, dengan delay realistis. `fireEvent.change` cuma trigger event DOM — lebih cepat tapi kurang realistis. Rule of thumb: **pakai `userEvent` untuk interaction test, `fireEvent` untuk quick trigger**.
+
+---
+
+### Konsep 4: Pre-commit Hooks — Cegah Commit Kotor
+
+`lint-staged` menjalankan linter + formatter **hanya pada file yang di-staging** (bukan seluruh project). Ini bikin pre-commit hook super cepat.
+
+```json
+// package.json
+"lint-staged": {
+  "*.{ts,tsx}": ["eslint --fix", "prettier --write"],
+  "*.{json,css,md}": ["prettier --write"]
+}
+```
+
+**Kenapa cuma staged files?** Di project besar, `eslint src/` bisa makan 30+ detik. `lint-staged` cuma proses file yang mau di-commit (~1 detik). Developer experience > completeness.
+
+**Kenapa gak pakai husky?** Husky butuh install git hooks + setup script. `lint-staged` bisa dijalankan manual: `npx lint-staged`. Untuk project kecil, manual sudah cukup — tidak worth overhead husky.
+
+---
+
+### Skill yang Dikuasai
+
+| Skill | Tool | Real-World Usage |
+|-------|------|------------------|
+| Component testing | Vitest + React Testing Library | Semua React project |
+| Mock pattern | `vi.fn()` + props injection | Unit test di semua framework |
+| Linting | ESLint flat config v10 | Semua JS/TS project |
+| Formatting | Prettier | Semua project |
+| Pre-commit hooks | lint-staged | Team development |
+| CI quality gates | GitHub Actions lint + test step | Every CI pipeline |
+| Test setup | jsdom, globals, setupFiles | Standard Vitest config |
+
+---
+
+### Referensi
+
+#### Testing
+- [Vitest Docs](https://vitest.dev/)
+- [React Testing Library](https://testing-library.com/react)
+- [Common mistakes with RTL](https://kentcdodds.com/blog/common-mistakes-with-react-testing-library)
+
+#### Code Quality
+- [ESLint Flat Config](https://eslint.org/docs/latest/use/configure/configuration-files)
+- [typescript-eslint](https://typescript-eslint.io/getting-started/)
+- [Prettier Docs](https://prettier.io/docs/)
+- [lint-staged](https://github.com/lint-staged/lint-staged)
+
+#### Related Project Docs
+- `docs/superpowers/specs/2026-07-16-phase9-backend-testing-design.md` — Part 1 design spec (backend)
+- `docs/PHASE8_IMPLEMENTASI_DEVOPS.md` — CI/CD pipeline tempat lint + test jalan
+- `docs/PHASE10_IMPLEMENTASI_SECURITY.md` — security hardening Phase 10
+- `TODO.md` — full project roadmap
+
+---
+
+**Phase 9 Complete** ✅  
+Dari 0 test + 0 linter di frontend ke 3 file, 13 test, ESLint flat config, Prettier, lint-staged, dan CI integration. Backend 67% coverage + frontend testing infrastructure siap — aplikasi ini punya quality gates di setiap layer.
