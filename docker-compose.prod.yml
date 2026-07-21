@@ -34,6 +34,9 @@ services:
       JWT_EXPIRATION: ${JWT_EXPIRATION:-900}
       LOG_FORMAT: json
       LOG_LEVEL: info
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      ENV: production
+      GIT_SHA: ${GIT_SHA:-unknown}
     depends_on:
       postgres:
         condition: service_healthy

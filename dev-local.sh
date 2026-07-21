@@ -234,6 +234,7 @@ export JWT_SECRET="${JWT_SECRET:-dev-secret-key-do-not-use-in-production}"
 export JWT_EXPIRATION="${JWT_EXPIRATION:-86400}"
 export LOG_FORMAT="${LOG_FORMAT:-text}"
 export LOG_LEVEL="${LOG_LEVEL:-debug}"
+export SENTRY_DSN="${SENTRY_DSN:-}"
 
 # ── Start backend ─────────────────────────────────────────────────────────
 log "Starting Go backend on http://localhost:8080 ..."

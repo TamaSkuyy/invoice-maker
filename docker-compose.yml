@@ -35,6 +35,8 @@ services:
       JWT_EXPIRATION: 86400
       LOG_FORMAT: text
       LOG_LEVEL: debug
+      SENTRY_DSN: ""
+      ENV: development
     depends_on:
       postgres:
         condition: service_healthy

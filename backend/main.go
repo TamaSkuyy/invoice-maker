@@ -274,6 +274,10 @@ func main() {
 	// JSON in production, human-readable text in development.
 	initLogger()
 
+	// Sentry error tracking — disabled kalau SENTRY_DSN tidak diset.
+	initSentry()
+	defer flushSentry()
+
 	// Initialize database
 	if err := initDB(); err != nil {
 		slog.Error("failed to initialize database", "error", err)

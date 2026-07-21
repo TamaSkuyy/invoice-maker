@@ -9,6 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
+	sentrygin "github.com/getsentry/sentry-go/gin"
 )
 
 // setupRouter builds the full Gin router. It relies on the package-level
@@ -16,6 +18,15 @@ import (
 // directly assigned in tests before calling setupRouter().
 func setupRouter() *gin.Engine {
 	r := gin.Default()
+
+	// Sentry middleware — tangkap panic dan kirim full stack trace ke sentry.io.
+	// Harus jadi middleware PERTAMA (setelah gin.Default) supaya bisa tangkap
+	// panic dari semua handler di bawahnya.
+	// Repanic: true → setelah kirim ke Sentry, lempar ulang panic-nya supaya
+	// gin.Recovery (bawaan gin.Default) tetap bisa handle graceful shutdown.
+	r.Use(sentrygin.New(sentrygin.Options{
+		Repanic: true,
+	}))
 
 	// Prometheus metrics middleware — catat setiap request (latency + status).
 	// Harus dipasang SEBELUM route handler, SESUDAH gin.Default().
