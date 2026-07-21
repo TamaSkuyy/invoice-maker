@@ -167,6 +167,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Setup buildx dengan docker-container driver — driver default
+      # (docker) tidak support cache export. Buildx juga diperlukan untuk
+      # multi-platform builds kalau nanti dibutuhkan.
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
+
       # ── Backend Image ──────────────────────────────────────────────────
       # Build dari backend/Dockerfile (production stage), push ke GHCR.
       - name: Build & push backend image
