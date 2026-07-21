@@ -17,6 +17,10 @@ import (
 func setupRouter() *gin.Engine {
 	r := gin.Default()
 
+	// Prometheus metrics middleware — catat setiap request (latency + status).
+	// Harus dipasang SEBELUM route handler, SESUDAH gin.Default().
+	r.Use(MetricsMiddleware())
+
 	// CORS  middleware for local frontend development
 	r.Use(func(c *gin.Context)  {
 		c.Header("Access-Control-Allow-Origin", "*")
@@ -848,6 +852,11 @@ func setupRouter() *gin.Engine {
 				c.JSON(http.StatusOK, gin.H{"message": "product deleted"})
 			})
 		}
+
+	// Prometheus metrics endpoint — no auth required.
+	// Di-scrape oleh Prometheus setiap 15 detik untuk mengumpulkan data
+	// performa aplikasi (request rate, latency, error rate).
+	r.GET("/api/metrics", MetricsHandler())
 
 	// Health check endpoint — no auth required.
 	// Used by Docker healthcheck, Prometheus, and uptime monitors.

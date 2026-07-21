@@ -1,0 +1,19 @@
+# =============================================================================
+# Prometheus Configuration — Invoice Maker
+# =============================================================================
+# Prometheus akan scrape /api/metrics dari backend setiap 15 detik.
+# Data disimpan sebagai time-series, lalu ditampilkan di Grafana.
+# =============================================================================
+
+global:
+  scrape_interval: 15s    # seberapa sering scrape metrics
+  evaluation_interval: 15s # seberapa sering evaluasi alert rules
+
+scrape_configs:
+  - job_name: "invoice-backend"
+    metrics_path: "/api/metrics"
+    static_configs:
+      - targets: ["backend:8080"]
+        labels:
+          service: "invoice-maker"
+          env: "production"

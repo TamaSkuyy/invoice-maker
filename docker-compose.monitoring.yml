@@ -1,0 +1,50 @@
+# =============================================================================
+# Monitoring Stack — Invoice Maker
+# =============================================================================
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+#
+# Akses:
+#   Prometheus: http://localhost:9090   (metrics explorer + targets status)
+#   Grafana:    http://localhost:3001   (dashboard, login: admin/admin)
+# =============================================================================
+
+services:
+  prometheus:
+    image: docker.io/prom/prometheus:v3.3.0
+    container_name: invoice-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--storage.tsdb.retention.time=15d"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+
+  grafana:
+    image: docker.io/grafana/grafana:11.6.0
+    container_name: invoice-grafana
+    environment:
+      # Credentials default (ganti di production!)
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      # Disable signup
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana-datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus_data:
+  grafana_data:

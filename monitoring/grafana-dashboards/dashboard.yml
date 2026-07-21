@@ -1,0 +1,12 @@
+# Grafana dashboard provisioning — auto-load dashboards dari folder ini
+apiVersion: 1
+
+providers:
+  - name: "Invoice Maker"
+    folder: ""
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
