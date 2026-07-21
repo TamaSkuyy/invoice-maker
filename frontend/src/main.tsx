@@ -16,7 +16,7 @@ createRoot(root).render(
     {/* Sentry ErrorBoundary: tangkap error React + tampilkan fallback UI,
         bukan cuma blank screen. Tetap kirim error ke Sentry. */}
     <Sentry.ErrorBoundary
-      fallback={({ error, resetError }) => (
+      fallback={({ error, resetError }: { error: unknown; resetError: () => void }) => (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="text-center p-8 max-w-md">
             <div className="text-4xl mb-4">⚠️</div>
@@ -34,7 +34,7 @@ createRoot(root).render(
             </button>
             {import.meta.env.DEV && (
               <pre className="mt-4 text-left text-xs text-red-600 bg-red-50 p-3 rounded overflow-auto max-h-40">
-                {error.message}
+                {error instanceof Error ? error.message : String(error)}
               </pre>
             )}
           </div>
