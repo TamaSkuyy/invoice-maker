@@ -193,26 +193,23 @@ Panduan pengembangan aplikasi Invoice Maker. Ini adalah project learning untuk m
 
 ### PWA Features
 
-- [ ] Add service worker for offline support
-- [ ] Installable app (add to home screen)
-- [ ] Offline invoice creation (sync when online)
+- [x] Add service worker for offline support — `sw.js` with stale-while-revalidate strategy, precache app shell, skip API calls
+- [x] Installable app (add to home screen) — `manifest.webmanifest`, icons (192+512), meta tags (theme-color, apple-mobile-web-app)
+- [ ] Offline invoice creation (sync when online) — deferred (butuh IndexedDB/background sync, scope besar)
 
 ### Mobile Optimization
 
-- [ ] Improve mobile UI/UX
-- [ ] Touch-friendly form inputs
-- [ ] Mobile-specific layouts
+- [x] Improve mobile UI/UX — `min-h-[44px]` touch targets, safe-area padding, momentum scrolling, mobile table horizontal scroll
+- [x] Touch-friendly form inputs — `min-height: 44px` all inputs+buttons (td: 36px), `inputmode` attributes
+- [x] Mobile-specific layouts — `grid-cols-1 sm:grid-cols-2` responsive, `min-w-[600px]` table, `-mx-4 px-4` scroll hint
 
-### Alternative: Native Mobile App
-
-- [ ] Build with React Native or Flutter
-- [ ] Sync with backend API
+### Alternative: Native Mobile App — skipped
 
 ### Learning Goal
 
-- Understand PWA architecture
-- Learn offline-first design
-- Practice mobile development
+- [x] Understand PWA architecture — manifest, service worker lifecycle, caching strategies (stale-while-revalidate vs cache-first)
+- [x] Learn offline-first design — app shell pattern, precache critical assets, skip API caching
+- [x] Practice mobile development — touch targets (44pt), safe area, responsive tables, momentum scroll
 
 ---
 

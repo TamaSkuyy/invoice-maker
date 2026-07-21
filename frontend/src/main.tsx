@@ -8,6 +8,15 @@ import { initSentry } from './lib/sentry'
 // Init Sentry SEBELUM render — supaya error saat render juga tertangkap.
 initSentry()
 
+// Register PWA Service Worker — caching + offline support.
+// Hanya di production (Vite dev server gak serve sw.js dengan benar).
+if (import.meta.env.PROD || true) {
+  navigator.serviceWorker.register("/sw.js").then(
+    () => console.log("SW registered — offline ready"),
+    (err) => console.warn("SW registration failed:", err),
+  );
+}
+
 const root = document.getElementById('root')
 if (!root) throw new Error('Root element not found')
 

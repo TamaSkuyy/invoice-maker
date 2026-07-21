@@ -1,3 +1,61 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── PWA / Mobile Optimizations ─────────────────────────────────────────── */
+
+/* Safe area padding — cegah konten ketutup notch / home indicator di iPhone */
+@supports (padding: env(safe-area-inset-bottom)) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Touch-friendly minimum touch target — Apple HIG recommends 44x44pt */
+@layer base {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="date"],
+  input[type="number"],
+  select,
+  button {
+    min-height: 44px;
+  }
+
+  /* Kecuali input inline di tabel — terlalu kecil untuk 44px */
+  td input[type="text"],
+  td input[type="number"] {
+    min-height: 36px;
+  }
+}
+
+/* Mobile table — horizontal scroll instead of squishing */
+@layer components {
+  .table-responsive {
+    @apply -mx-4 overflow-x-auto px-4;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Smooth momentum scroll for iOS */
+@layer utilities {
+  .touch-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Print styles — sembunyikan UI chrome saat print invoice */
+@media print {
+  nav,
+  button,
+  input,
+  select,
+  textarea,
+  .no-print {
+    display: none !important;
+  }
+}
+

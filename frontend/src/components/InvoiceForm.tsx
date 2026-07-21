@@ -113,8 +113,8 @@ export default function InvoiceForm({ onSaved }: Props) {
         <label className="block text-sm font-medium text-gray-600 mb-2">
           Line Items
         </label>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto -mx-4 px-4 touch-scroll">
+          <table className="w-full text-sm min-w-[600px]">
             <thead>
               <tr className="bg-gray-100 text-left text-xs uppercase text-gray-500">
                 <th className="px-3 py-2">Description</th>
