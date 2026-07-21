@@ -550,5 +550,45 @@ Mekanisme perlindungan:
 
 ---
 
-**Phase 10 Security Selesai** ✅
-Invoice Maker kini punya defense-in-depth: TLS + security headers + rate limiting + input validation + parameterized queries + database constraints. Ini adalah security baseline yang membedakan "project belajar" dari "aplikasi yang aman dipakai orang lain."
+---
+
+## Bonus: React Code Splitting — Lazy Loading
+
+**Tanggal**: 21 Juli 2026
+
+### Kenapa Ini Masuk Phase 10?
+
+Phase 10 mencakup performance optimization. Salah satu quick win terbesar untuk frontend performance adalah **code splitting** — memisahkan bundle JavaScript menjadi chunk-chunk kecil yang di-download hanya saat dibutuhkan.
+
+### Problem: Bundle Monolitik
+
+Semua JavaScript di-download dalam satu bundle besar. Termasuk `recharts` (150KB gzip) — library charting yang hanya dipakai di tab Analytics. User yang cuma bikin invoice tetap harus download library yang tidak dipakai.
+
+### Solusi: React.lazy() + Suspense
+
+```tsx
+// ProtectedInvoiceDashboard.tsx
+import { lazy, Suspense } from "react";
+
+// Chart components di-split ke chunk terpisah.
+// Download hanya saat component pertama kali di-render.
+const RevenueChart = lazy(() =>
+  import("./RevenueChart").then(m => ({ default: m.RevenueChart }))
+);
+
+// Bungkus dengan Suspense + fallback skeleton
+<Suspense fallback={<ChartSkeleton />}>
+  <RevenueChart ... />
+</Suspense>
+```
+
+**Kenapa `.then(m => ({ default: m.X }))`?** `React.lazy()` hanya support default export. RevenueChart adalah named export. `.then()` mengubahnya.
+
+**Hasil:** Vite build menghasilkan chunk terpisah untuk `recharts` + chart components. User yang tidak buka Analytics tidak mendownload library 150KB.
+
+**Kenapa tidak lazy-load routes?** Project belum pakai router (React Router). Navigasi pakai state. Lazy-load routes butuh implementasi router — overkill untuk benefit yang sama. Lazy-load components yang berat = 80% benefit dengan 20% effort.
+
+---
+
+**Phase 10 Complete** ✅  
+Invoice Maker kini punya defense-in-depth: TLS + security headers + rate limiting + input validation + parameterized queries + database constraints + code splitting. Ini adalah security + performance baseline yang membedakan "project belajar" dari "aplikasi yang siap production."

@@ -855,5 +855,163 @@ describe("LoginPage", () => {
 
 ---
 
+---
+
+## Part 3: Swagger API Documentation + Playwright E2E
+
+**Tanggal**: 21 Juli 2026  
+**Scope**: Swagger/OpenAPI docs via swaggo (annotations + UI), Playwright E2E smoke tests, React lazy loading
+
+---
+
+### Problem: API Tanpa Dokumentasi + Tanpa E2E
+
+#### ❌ Sebelum Part 3
+
+```
+API documentation:  README.md (manual, gampang outdated)
+E2E tests:          tidak ada
+Frontend bundle:    semua component di-download sekaligus (termasuk recharts 150KB)
+```
+
+**Masalah:**
+1. **API docs manual di README** — gampang outdated, gak interaktif, gak ada "Try it out" button
+2. **Gak ada E2E tests** — unit + integration test ada, tapi gak ada yg test full user flow dari perspektif browser
+3. **Bundle size besar** — `recharts` 150KB+ di-download bahkan saat user cuma bikin invoice (gak buka Analytics)
+
+#### ✅ Setelah Part 3
+
+```
+API documentation:  /swagger/index.html (auto-generated, interaktif)
+E2E tests:          5 Playwright smoke tests (login flow, register navigation)
+Frontend bundle:    recharts di-split ke chunk terpisah, lazy-loaded
+```
+
+---
+
+### Konsep 1: Swagger/OpenAPI — Dokumentasi yang Hidup
+
+**Kenapa swaggo?** Swaggo membaca Go code annotations dan generate `swagger.json` + Swagger UI secara otomatis. Setiap kali code berubah → regenerate → docs selalu up-to-date. Ini jauh lebih baik dari README manual yang selalu outdated.
+
+```go
+// main.go — annotations di package doc comment
+// @title           Invoice Maker API
+// @version         1.0
+// @description     Full-featured invoice management REST API.
+// @host            localhost:8080
+// @BasePath        /api
+// @securityDefinitions.apikey BearerAuth
+// @in              header
+// @name            Authorization
+```
+
+**Cara generate & akses:**
+```bash
+swag init --dir . --generalInfo main.go --output docs
+# Generated: docs/docs.go, docs/swagger.json, docs/swagger.yaml
+
+# Buka di browser:
+# http://localhost:8080/swagger/index.html
+```
+
+**Kenapa route di `/swagger/*any` bukan `/api/swagger`?** Swagger UI adalah static HTML + JS + CSS. Bukan API endpoint. Dipisah dari `/api` prefix supaya gak ikut kena rate limiting dan CORS middleware.
+
+**Kenapa import `_ "github.com/.../docs"` di router?** Package `docs` di-generate oleh swag — isinya embedded Swagger JSON spec. Blank import (`_`) memastikan `init()` di package docs terpanggil dan register spec ke global registry swaggo.
+
+---
+
+### Konsep 2: Playwright — E2E dari Perspektif User
+
+**Kenapa Playwright, bukan Cypress?** Playwright punya beberapa keunggulan: auto-wait (gak perlu `cy.wait()` manual), multi-browser (Chromium + Firefox + WebKit), mobile emulation, dan tracing/debugging tools yang lebih baik. Plus, Playwright bisa test di CI tanpa display server.
+
+```ts
+// e2e/app.spec.ts — E2E test flow
+test("login page loads correctly", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("h1")).toHaveText("Invoice Maker");
+  await expect(page.getByRole("button", { name: "Login" })).toBeVisible();
+});
+
+test("login form accepts input", async ({ page }) => {
+  await page.goto("/");
+  await page.fill("#email", "test@example.com");
+  await page.fill("#password", "mypassword123");
+  await expect(page.locator("#email")).toHaveValue("test@example.com");
+});
+```
+
+**Kenapa test terpisah dari Vitest?** Vitest = unit/integration (jsdom simulation, cepat, parallel). Playwright = E2E (real browser, real network, lambat). Masing-masing punya strengths berbeda — digabungin bikin test suite lambat.
+
+Testing pyramid sekarang lengkap:
+```
+         /\        E2E (Playwright)    — 5 tests, real browser
+        /  \       Integration (RTL)   — 13 tests, jsdom
+       /    \      Unit (Vitest/Go)    — 17+ functions
+      ────────
+```
+
+**Kenapa Playwright config pakai `webServer`?** Playwright bisa auto-start dev server sebelum test dan auto-kill setelahnya. Tapi kita set `reuseExistingServer: true` — jadi bisa start dev server manual (`npm run dev`) dan Playwright attach ke situ. Lebih cepat untuk development loop.
+
+---
+
+### Konsep 3: React.lazy — Code Splitting
+
+**Kenapa code splitting?** User yang cuma bikin invoice (tanpa buka Analytics) gak perlu download `recharts` (150KB gzip). `React.lazy()` + `Suspense` memisahkan component ke chunk terpisah yang di-download hanya saat dibutuhkan.
+
+```tsx
+// ProtectedInvoiceDashboard.tsx
+import { lazy, Suspense } from "react";
+
+// RevenueChart & TopClientsChart di-split ke chunk terpisah.
+// Import hanya terjadi saat component pertama kali di-render.
+const RevenueChart = lazy(() =>
+  import("./RevenueChart").then(m => ({ default: m.RevenueChart }))
+);
+const TopClientsChart = lazy(() =>
+  import("./TopClientsChart").then(m => ({ default: m.TopClientsChart }))
+);
+
+// Penggunaan: bungkus dengan <Suspense> + fallback UI
+<Suspense fallback={<ChartSkeleton />}>
+  <RevenueChart data={revenue} loading={loading} year={year} onYearChange={fn} />
+</Suspense>
+```
+
+**Kenapa `.then(m => ({ default: m.RevenueChart }))`?** `React.lazy()` hanya support **default export**. `RevenueChart` adalah **named export**. `.then()` mengubah named export menjadi default export object. Alternatif: ubah component dari named ke default export — tapi ini breaking change untuk semua import site.
+
+**Kenapa bukan lazy-load App routes?** Lazy-loading di route level (`LoginPage`, `Dashboard`) butuh router (React Router). Project ini belum pakai router — navigasi pakai state (`page` variable). Implementing router hanya untuk lazy loading = overkill. Lazy-load chart components beri 80% benefit dengan 20% effort.
+
+**Cara verifikasi:** Buka DevTools → Network tab → buka Analytics → lihat chunk `.js` terpisah di-download.
+
+---
+
+### Skill yang Dikuasai (Part 3)
+
+| Skill | Tool/Pattern | Real-World Usage |
+|-------|-------------|------------------|
+| API documentation | Swaggo annotations + Swagger UI | Every production API |
+| E2E testing | Playwright (auto-wait, multi-browser) | Modern web app testing |
+| Code splitting | `React.lazy()` + `Suspense` | Performance optimization |
+| Named → default export | `.then(m => ({ default: m.X }))` | Legacy component interop |
+
+---
+
+### Referensi
+
+#### Swagger
+- [swaggo/swag](https://github.com/swaggo/swag)
+- [gin-swagger](https://github.com/swaggo/gin-swagger)
+- [OpenAPI Specification](https://swagger.io/specification/)
+
+#### Playwright
+- [Playwright Docs](https://playwright.dev/)
+- [Playwright vs Cypress](https://playwright.dev/docs/why-playwright)
+
+#### React
+- [React.lazy](https://react.dev/reference/react/lazy)
+- [Code Splitting](https://react.dev/learn/code-splitting)
+
+---
+
 **Phase 9 Complete** ✅  
-Dari 0 test + 0 linter di frontend ke 3 file, 13 test, ESLint flat config, Prettier, lint-staged, dan CI integration. Backend 67% coverage + frontend testing infrastructure siap — aplikasi ini punya quality gates di setiap layer.
+Dari 0 test + 0 linter + 0 docs di frontend ke 3 file Vitest (13 tests), 5 Playwright E2E tests, ESLint flat config, Prettier, lint-staged, Swagger API docs, dan React lazy loading. Backend 67% coverage + frontend testing pyramid lengkap + API docs interaktif — aplikasi ini punya quality gates di setiap layer.
