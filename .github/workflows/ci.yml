@@ -1,0 +1,209 @@
+# =============================================================================
+# CI/CD Pipeline — Invoice Maker
+# =============================================================================
+# Trigger: setiap push & pull request ke branch main.
+#
+# Flow:
+#   1. test-backend  ──┐                          (jalan paralel)
+#   2. test-frontend ──┘
+#       │
+#       ▼  (keduanya harus sukses)
+#   3. build-and-push   (hanya jalan kalau push ke main, bukan PR)
+#
+# Konsep:
+#   - Service container: PostgreSQL berjalan sebagai "sidecar" untuk testing
+#   - Caching: Go modules & Docker layers di-cache biar pipeline cepat
+#   - Conditional: Build & push hanya terjadi di branch main
+# =============================================================================
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# ── Environment variables (dipakai semua job) ──────────────────────────────
+# CATATAN KEAMANAN: DB_USER, DB_PASSWORD, DB_NAME di sini adalah kredensial
+# untuk container PostgreSQL sementara (service container) yang hanya hidup
+# selama CI job berlangsung. Container ini TIDAK exposed ke internet dan
+# otomatis dihancurkan setelah job selesai. Kredensial ini BUKAN untuk
+# database production. Untuk production, gunakan GitHub Secrets.
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ghcr.io/tamaskuyy/invoice-maker-backend
+  FRONTEND_IMAGE: ghcr.io/tamaskuyy/invoice-maker-frontend
+  DB_USER: invoiceuser
+  DB_PASSWORD: invoicepassword
+  DB_NAME: invoicedb
+  DB_HOST: localhost
+  DB_PORT: "5432"
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════
+  # Job 1: Backend Tests
+  # ═══════════════════════════════════════════════════════════════════════
+  test-backend:
+    name: "🔧 Test Backend (Go)"
+    runs-on: ubuntu-latest
+
+    # Service container: PostgreSQL yang jalan barengan dengan job ini.
+    # Container ini punya hostname sendiri ("postgres") di network internal,
+    # tapi kita akses via localhost karena GitHub Actions map port-nya.
+    services:
+      postgres:
+        image: docker.io/library/postgres:16-alpine
+        env:
+          POSTGRES_USER: invoiceuser
+          POSTGRES_PASSWORD: invoicepassword
+          POSTGRES_DB: invoicedb
+        ports:
+          - 5432:5432
+        # Health check: tunggu sampai PostgreSQL benar-benar siap
+        options: >-
+          --health-cmd "pg_isready -U invoiceuser -d invoicedb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      # Step 1: Clone repository
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+
+      # Step 2: Setup Go
+      - name: Setup Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: backend/go.sum
+
+      # Step 3: Run tests
+      - name: Run Go tests
+        working-directory: backend
+        env:
+          # Override DB_HOST karena di GitHub Actions, PostgreSQL
+          # container bisa diakses via localhost (beda sama Docker Compose).
+          # Kredensial & JWT di bawah hanya untuk CI testing — container
+          # PostgreSQL sementara, tidak exposed, hancur setelah job selesai.
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          DB_USER: invoiceuser
+          DB_PASSWORD: invoicepassword
+          DB_NAME: invoicedb
+          JWT_SECRET: ci-test-secret-key-min-32-characters!!
+          JWT_EXPIRATION: "900"
+          LOG_FORMAT: text
+          LOG_LEVEL: warn
+        run: |
+          go test ./... -count=1 -v -coverprofile=coverage.out
+
+      # Step 4: Tampilkan coverage summary
+      - name: Coverage summary
+        working-directory: backend
+        run: go tool cover -func=coverage.out
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # Job 2: Frontend Build Check
+  # ═══════════════════════════════════════════════════════════════════════
+  test-frontend:
+    name: "🎨 Test Frontend (TypeScript + Vite)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
+        with:
+          bun-version: "1.1"
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: bun install --frozen-lockfile
+
+      # TypeScript type-check (tanpa emit file)
+      # Ini "compiler check" — memastikan tidak ada type error
+      - name: TypeScript check
+        working-directory: frontend
+        run: bun x tsc --noEmit
+
+      # Build production bundle — memastikan build tidak error
+      - name: Vite build
+        working-directory: frontend
+        run: bun run build
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # Job 3: Build & Push Docker Images
+  # ═══════════════════════════════════════════════════════════════════════
+  # Hanya jalan kalau:
+  #   - Kedua test job sukses (needs: [test-backend, test-frontend])
+  #   - Trigger dari push ke main (bukan pull request)
+  build-and-push:
+    name: "🐳 Build & Push Docker Images"
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    # Permission: butuh write access ke GitHub Packages (GHCR)
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+
+      # Login ke GitHub Container Registry.
+      # GITHUB_TOKEN adalah token otomatis yang dibuat oleh GitHub Actions.
+      - name: Login to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Backend Image ──────────────────────────────────────────────────
+      # Build dari backend/Dockerfile (production stage), push ke GHCR.
+      - name: Build & push backend image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+            ${{ env.BACKEND_IMAGE }}:latest
+          # Docker layer caching pakai GitHub Actions cache = build lebih cepat
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Frontend Image ─────────────────────────────────────────────────
+      - name: Build & push frontend image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Summary ────────────────────────────────────────────────────────
+      - name: Print summary
+        run: |
+          echo ""
+          echo "================================================"
+          echo "  Docker Images Published to GHCR"
+          echo "================================================"
+          echo ""
+          echo "  Backend:  ${{ env.BACKEND_IMAGE }}:${{ github.sha }}"
+          echo "  Frontend: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}"
+          echo ""
+          echo "  Pull commands:"
+          echo "    docker pull ${{ env.BACKEND_IMAGE }}:latest"
+          echo "    docker pull ${{ env.FRONTEND_IMAGE }}:latest"
+          echo ""
+          echo "================================================"
