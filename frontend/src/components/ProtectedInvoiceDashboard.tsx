@@ -39,6 +39,7 @@ import type {
 interface ProtectedInvoiceDashboardProps {
   user: User | null;
   onLogout: () => void;
+  onNavigateToSettings?: () => void;
 }
 
 const currentYear = new Date().getFullYear();
@@ -46,6 +47,7 @@ const currentYear = new Date().getFullYear();
 export function ProtectedInvoiceDashboard({
   user,
   onLogout,
+  onNavigateToSettings,
 }: ProtectedInvoiceDashboardProps) {
   // Legacy state
   const [savedInvoices, setSavedInvoices] = useState<Invoice[]>([]);
@@ -170,7 +172,7 @@ export function ProtectedInvoiceDashboard({
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <Navbar user={user} onLogout={onLogout} />
+      <Navbar user={user} onLogout={onLogout} onNavigateToSettings={onNavigateToSettings} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
 
         {/* ── Dashboard Section ─────────────────────────────────── */}

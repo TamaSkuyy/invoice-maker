@@ -3,9 +3,10 @@ import { useAuth } from "./hooks/useAuth";
 import { AuthLayout } from "./components/AuthLayout";
 import { LoginPage } from "./components/LoginPage";
 import { RegisterPage } from "./components/RegisterPage";
+import { SettingsPage } from "./components/SettingsPage";
 import { ProtectedInvoiceDashboard } from "./components/ProtectedInvoiceDashboard";
 
-type PageType = "login" | "register" | "dashboard";
+type PageType = "login" | "register" | "dashboard" | "settings";
 
 export default function App() {
   const auth = useAuth();
@@ -74,6 +75,21 @@ export default function App() {
     );
   }
 
+  if (page === "settings") {
+    return (
+      <SettingsPage
+        user={user}
+        onBack={() => setPage("dashboard")}
+        onLogout={() => {
+          logout();
+          setPage("login");
+        }}
+        updateProfile={auth.updateProfile}
+        changePassword={auth.changePassword}
+      />
+    );
+  }
+
   return (
     <ProtectedInvoiceDashboard
       user={user}
@@ -81,6 +97,7 @@ export default function App() {
         logout();
         setPage("login");
       }}
+      onNavigateToSettings={() => setPage("settings")}
     />
   );
 }

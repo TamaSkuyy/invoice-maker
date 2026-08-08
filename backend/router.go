@@ -172,6 +172,92 @@ func setupRouter() *gin.Engine {
 
 			c.JSON(http.StatusOK, user)
 		})
+
+			// Update profile (protected)
+			auth.PUT("/profile", authenticate(), func(c *gin.Context) {
+				userID, _ := c.Get("user_id")
+
+				var req struct {
+					Email string `json:"email" binding:"required,email"`
+				}
+				if err := c.ShouldBindJSON(&req); err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+					return
+				}
+
+				ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+				defer cancel()
+
+				// Check if email is taken by another user
+				var exists bool
+				err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND id != $2)", req.Email, userID).Scan(&exists)
+				if err != nil || exists {
+					c.JSON(http.StatusConflict, gin.H{"error": "email already taken"})
+					return
+				}
+
+				now := time.Now()
+				var user User
+				err = db.QueryRow(ctx,
+					"UPDATE users SET email = $1, updated_at = $2 WHERE id = $3 RETURNING id, email, created_at, updated_at",
+					req.Email, now, userID,
+				).Scan(&user.ID, &user.Email, &user.CreatedAt, &user.UpdatedAt)
+				if err != nil {
+					slog.Error("update profile error", "error", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update profile"})
+					return
+				}
+
+				c.JSON(http.StatusOK, user)
+			})
+
+			// Change password (protected)
+			auth.PUT("/change-password", authenticate(), func(c *gin.Context) {
+				userID, _ := c.Get("user_id")
+
+				var req struct {
+					CurrentPassword string `json:"current_password" binding:"required"`
+					NewPassword     string `json:"new_password" binding:"required,min=8"`
+				}
+				if err := c.ShouldBindJSON(&req); err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+					return
+				}
+
+				ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+				defer cancel()
+
+				// Get current password hash
+				var passwordHash string
+				err := db.QueryRow(ctx, "SELECT password_hash FROM users WHERE id = $1", userID).Scan(&passwordHash)
+				if err != nil {
+					c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+					return
+				}
+
+				// Verify current password
+				if !verifyPassword(passwordHash, req.CurrentPassword) {
+					c.JSON(http.StatusUnauthorized, gin.H{"error": "current password is incorrect"})
+					return
+				}
+
+				// Hash new password
+				newHash, err := hashPassword(req.NewPassword)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to process password"})
+					return
+				}
+
+				// Update password
+				_, err = db.Exec(ctx, "UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3", newHash, time.Now(), userID)
+				if err != nil {
+					slog.Error("change password error", "error", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to change password"})
+					return
+				}
+
+				c.JSON(http.StatusOK, gin.H{"message": "password changed successfully"})
+			})
 	}
 
 	// Invoice routes (protected)

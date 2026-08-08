@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
-import { User, AuthResponse } from "../types/auth";
+import {
+  User,
+  AuthResponse,
+  UpdateProfileRequest,
+  ChangePasswordRequest,
+} from "../types/auth";
 import { apiFetch, ApiError } from "../utils/api";
 
 export interface UseAuthResult {
@@ -11,6 +16,11 @@ export interface UseAuthResult {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  updateProfile: (email: string) => Promise<User>;
+  changePassword: (
+    currentPassword: string,
+    newPassword: string,
+  ) => Promise<void>;
 }
 
 export function useAuth(): UseAuthResult {
@@ -92,6 +102,48 @@ export function useAuth(): UseAuthResult {
     localStorage.removeItem("auth_user");
   };
 
+  const updateProfile = async (email: string): Promise<User> => {
+    setError(null);
+
+    try {
+      const updated = await apiFetch<User>("/auth/profile", {
+        method: "PUT",
+        body: JSON.stringify({ email } satisfies UpdateProfileRequest),
+      });
+
+      setUser(updated);
+      localStorage.setItem("auth_user", JSON.stringify(updated));
+      return updated;
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "Failed to update profile";
+      setError(message);
+      throw err;
+    }
+  };
+
+  const changePassword = async (
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> => {
+    setError(null);
+
+    try {
+      await apiFetch<void>("/auth/change-password", {
+        method: "PUT",
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        } satisfies ChangePasswordRequest),
+      });
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "Failed to change password";
+      setError(message);
+      throw err;
+    }
+  };
+
   return {
     user,
     token,
@@ -101,5 +153,7 @@ export function useAuth(): UseAuthResult {
     login,
     register,
     logout,
+    updateProfile,
+    changePassword,
   };
 }
