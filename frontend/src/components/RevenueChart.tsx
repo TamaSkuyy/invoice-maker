@@ -31,15 +31,15 @@ const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
 export function RevenueChart({ data, loading, year, onYearChange }: RevenueChartProps) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+        <h3 className="text-lg font-semibold text-gray-700">
           Revenue Overview
         </h3>
         <select
           value={year}
           onChange={(e) => onYearChange(Number(e.target.value))}
-          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
         >
           {years.map((y) => (
             <option key={y} value={y}>
@@ -51,7 +51,7 @@ export function RevenueChart({ data, loading, year, onYearChange }: RevenueChart
 
       {loading ? (
         <div className="h-64 flex items-center justify-center">
-          <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full" />
+          <div className="animate-spin h-6 w-6 border-2 border-green-500 border-t-transparent rounded-full" />
         </div>
       ) : data.length === 0 ? (
         <div className="h-64 flex items-center justify-center text-gray-400 text-sm">
@@ -64,7 +64,7 @@ export function RevenueChart({ data, loading, year, onYearChange }: RevenueChart
             <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#6b7280" }} />
             <YAxis tickFormatter={formatTick} tick={{ fontSize: 12, fill: "#6b7280" }} />
             <Tooltip formatter={(value: number) => [formatTooltip(Number(value)), "Revenue"]} />
-            <Bar dataKey="total" fill="#2563eb" radius={[4, 4, 0, 0]} maxBarSize={40} />
+            <Bar dataKey="total" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={40} />
           </BarChart>
         </ResponsiveContainer>
       )}

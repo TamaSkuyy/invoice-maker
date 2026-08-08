@@ -13,11 +13,11 @@ export default function InvoicePreview({ invoice }: Props) {
   const total = invoice.total_amount ?? subtotal + taxAmount
 
   return (
-    <div className="bg-white shadow-lg rounded-lg p-8 font-sans text-gray-800 print:shadow-none">
+    <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-8 font-sans text-gray-800 print:shadow-none print:border-none print:rounded-none">
       {/* Header */}
       <div className="flex justify-between items-start mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-blue-600 tracking-wide">
+          <h1 className="text-3xl font-bold text-emerald-700 tracking-wide">
             INVOICE
           </h1>
           {invoice.id && (
@@ -41,25 +41,25 @@ export default function InvoicePreview({ invoice }: Props) {
       {/* Items Table */}
       <table className="w-full text-sm mb-6">
         <thead>
-          <tr className="bg-blue-600 text-white">
-            <th className="px-4 py-2 text-left rounded-tl">Description</th>
-            <th className="px-4 py-2 text-right w-20">Qty</th>
-            <th className="px-4 py-2 text-right w-28">Unit Price</th>
-            <th className="px-4 py-2 text-right w-28 rounded-tr">Amount</th>
+          <tr className="bg-emerald-700 text-white">
+            <th className="px-4 py-2.5 text-left rounded-tl-lg">Description</th>
+            <th className="px-4 py-2.5 text-right w-20">Qty</th>
+            <th className="px-4 py-2.5 text-right w-28">Unit Price</th>
+            <th className="px-4 py-2.5 text-right w-28 rounded-tr-lg">Amount</th>
           </tr>
         </thead>
         <tbody>
           {invoice.items.map((item, idx) => (
             <tr
               key={idx}
-              className={idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}
+              className={idx % 2 === 0 ? 'bg-gray-50/50' : 'bg-white'}
             >
-              <td className="px-4 py-2">{item.description}</td>
-              <td className="px-4 py-2 text-right font-mono">{item.qty}</td>
-              <td className="px-4 py-2 text-right font-mono">
+              <td className="px-4 py-2.5">{item.description}</td>
+              <td className="px-4 py-2.5 text-right font-mono">{item.qty}</td>
+              <td className="px-4 py-2.5 text-right font-mono">
                 Rp {item.price.toFixed(2)}
               </td>
-              <td className="px-4 py-2 text-right font-mono">
+              <td className="px-4 py-2.5 text-right font-mono">
                 Rp {(item.qty * item.price).toFixed(2)}
               </td>
             </tr>
@@ -69,7 +69,7 @@ export default function InvoicePreview({ invoice }: Props) {
 
       {/* Totals */}
       <div className="flex justify-end">
-        <div className="w-56 space-y-1 text-sm">
+        <div className="w-56 space-y-1.5 text-sm">
           <div className="flex justify-between text-gray-500">
             <span>Subtotal</span>
             <span className="font-mono">Rp {subtotal.toFixed(2)}</span>
@@ -80,7 +80,7 @@ export default function InvoicePreview({ invoice }: Props) {
           </div>
           <div className="flex justify-between border-t border-gray-300 pt-2 font-bold text-base">
             <span>Total</span>
-            <span className="font-mono text-blue-600">Rp {total.toFixed(2)}</span>
+            <span className="font-mono text-emerald-700">Rp {total.toFixed(2)}</span>
           </div>
         </div>
       </div>

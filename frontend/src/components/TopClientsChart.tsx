@@ -13,7 +13,7 @@ interface TopClientsChartProps {
   loading: boolean;
 }
 
-const COLORS = ["#2563eb", "#7c3aed", "#059669", "#d97706", "#dc2626"];
+const COLORS = ["#059669", "#14b8a6", "#6366f1", "#d97706", "#dc2626"];
 
 function formatTooltip(value: number): string {
   return `Rp ${value.toLocaleString("id-ID")}`;
@@ -25,14 +25,14 @@ function truncateName(name: string, maxLen: number = 18): string {
 
 export function TopClientsChart({ data, loading }: TopClientsChartProps) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">
+    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+      <h3 className="text-lg font-semibold text-gray-700 mb-4">
         Top Clients
       </h3>
 
       {loading ? (
         <div className="h-64 flex items-center justify-center">
-          <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full" />
+          <div className="animate-spin h-6 w-6 border-2 border-green-500 border-t-transparent rounded-full" />
         </div>
       ) : data.length === 0 ? (
         <div className="h-64 flex items-center justify-center text-gray-400 text-sm">

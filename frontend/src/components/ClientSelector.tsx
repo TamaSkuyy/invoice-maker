@@ -74,7 +74,7 @@ export default function ClientSelector({ value, onChange }: Props) {
       </label>
 
       <select
-        className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
         value={selectedClient?.id ?? (value ? "__manual__" : "")}
         onChange={handleSelect}
         disabled={loading}
@@ -88,32 +88,30 @@ export default function ClientSelector({ value, onChange }: Props) {
         <option value="__add__">+ Add new client...</option>
       </select>
 
-      {/* Manual name input (always shown) */}
       <input
-        className="mt-2 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
         value={value}
         onChange={(e) => onChange(e.target.value, selectedClient?.id ?? null)}
         placeholder="Or type client name manually"
       />
 
-      {/* Inline add form */}
       {showAdd && (
-        <div className="mt-3 rounded border border-blue-200 bg-blue-50 p-4 space-y-3">
-          <p className="text-sm font-medium text-blue-800">Add New Client</p>
+        <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4 space-y-3">
+          <p className="text-sm font-medium text-green-800">Add New Client</p>
           <input
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Client name *"
           />
           <input
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
             placeholder="Email (optional)"
           />
           <input
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
             value={newPhone}
             onChange={(e) => setNewPhone(e.target.value)}
             placeholder="Phone (optional)"
@@ -122,13 +120,13 @@ export default function ClientSelector({ value, onChange }: Props) {
             <button
               onClick={handleAddClient}
               disabled={saving || !newName.trim()}
-              className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 shadow-sm transition-colors"
             >
               {saving ? "Saving..." : "Save Client"}
             </button>
             <button
               onClick={() => setShowAdd(false)}
-              className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
             >
               Cancel
             </button>

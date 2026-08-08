@@ -78,16 +78,16 @@ export default function InvoiceForm({ onSaved }: Props) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-700">New Invoice</h2>
+      <h2 className="text-lg font-semibold text-gray-700">New Invoice</h2>
 
       {error && (
-        <div className="rounded bg-red-50 p-3 text-sm text-red-600">
+        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
       {/* Client & Date */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <ClientSelector
           value={clientName}
           onChange={(name, id) => {
@@ -101,7 +101,7 @@ export default function InvoiceForm({ onSaved }: Props) {
           </label>
           <input
             type="date"
-            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
@@ -116,21 +116,21 @@ export default function InvoiceForm({ onSaved }: Props) {
         <div className="overflow-x-auto -mx-4 px-4 touch-scroll">
           <table className="w-full text-sm min-w-[600px]">
             <thead>
-              <tr className="bg-gray-100 text-left text-xs uppercase text-gray-500">
-                <th className="px-3 py-2">Description</th>
-                <th className="px-3 py-2 w-20">Qty</th>
-                <th className="px-3 py-2 w-28">Unit Price</th>
-                <th className="px-3 py-2 w-28 text-right">Amount</th>
-                <th className="px-3 py-2 w-10"></th>
+              <tr className="bg-gray-50 text-xs uppercase text-gray-600 tracking-wide">
+                <th className="px-3 py-2.5 text-left font-medium">Description</th>
+                <th className="px-3 py-2.5 w-20 font-medium">Qty</th>
+                <th className="px-3 py-2.5 w-28 font-medium">Unit Price</th>
+                <th className="px-3 py-2.5 w-28 text-right font-medium">Amount</th>
+                <th className="px-3 py-2.5 w-10"></th>
               </tr>
             </thead>
             <tbody>
               {items.map((item, idx) => (
-                <tr key={idx} className="border-b border-gray-100">
-                  <td className="px-3 py-1">
+                <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  <td className="px-3 py-1.5">
                     <div className="flex items-center gap-1">
                       <input
-                        className="flex-1 rounded border border-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                        className="flex-1 rounded-lg border border-gray-300 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                         value={item.description}
                         onChange={(e) =>
                           updateItem(idx, "description", e.target.value)
@@ -145,23 +145,23 @@ export default function InvoiceForm({ onSaved }: Props) {
                       />
                     </div>
                   </td>
-                  <td className="px-3 py-1">
+                  <td className="px-3 py-1.5">
                     <input
                       type="number"
                       min={1}
-                      className="w-full rounded border border-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                      className="w-full rounded-lg border border-gray-300 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                       value={item.qty}
                       onChange={(e) =>
                         updateItem(idx, "qty", parseFloat(e.target.value) || 0)
                       }
                     />
                   </td>
-                  <td className="px-3 py-1">
+                  <td className="px-3 py-1.5">
                     <input
                       type="number"
                       min={0}
                       step={0.01}
-                      className="w-full rounded border border-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                      className="w-full rounded-lg border border-gray-300 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                       value={item.price}
                       onChange={(e) =>
                         updateItem(
@@ -172,14 +172,14 @@ export default function InvoiceForm({ onSaved }: Props) {
                       }
                     />
                   </td>
-                  <td className="px-3 py-1 text-right font-mono">
+                  <td className="px-3 py-1.5 text-right font-mono text-gray-600">
                     Rp {(item.qty * item.price).toFixed(2)}
                   </td>
-                  <td className="px-3 py-1 text-center">
+                  <td className="px-3 py-1.5 text-center">
                     {items.length > 1 && (
                       <button
                         onClick={() => removeItem(idx)}
-                        className="text-red-400 hover:text-red-600"
+                        className="text-red-400 hover:text-red-600 transition-colors"
                         title="Remove item"
                       >
                         ✕
@@ -193,7 +193,7 @@ export default function InvoiceForm({ onSaved }: Props) {
         </div>
         <button
           onClick={addItem}
-          className="mt-2 text-sm text-blue-500 hover:underline"
+          className="mt-2 text-sm font-medium text-green-600 hover:text-green-500 transition-colors"
         >
           + Add line item
         </button>
@@ -201,30 +201,30 @@ export default function InvoiceForm({ onSaved }: Props) {
 
       {/* Tax & Totals */}
       <div className="flex justify-end">
-        <div className="w-64 space-y-1 text-sm">
+        <div className="w-64 space-y-1.5 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-500">Subtotal</span>
-            <span className="font-mono">Rp {subtotal.toFixed(2)}</span>
+            <span className="font-mono text-gray-700">Rp {subtotal.toFixed(2)}</span>
           </div>
           <div className="flex items-center justify-between">
-            <label className="text-gray-500">
-              Tax&nbsp;
+            <label className="text-gray-500 flex items-center gap-1">
+              Tax
               <input
                 type="number"
                 min={0}
                 max={100}
                 step={0.5}
-                className="w-14 rounded border border-gray-200 px-1 py-0.5 text-center font-mono focus:outline-none focus:ring-1 focus:ring-blue-300"
+                className="w-14 rounded-lg border border-gray-300 px-1.5 py-0.5 text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 value={taxRate}
                 onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
               />
               %
             </label>
-            <span className="font-mono">Rp {taxAmount.toFixed(2)}</span>
+            <span className="font-mono text-gray-700">Rp {taxAmount.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between border-t border-gray-200 pt-1 font-semibold">
-            <span>Grand Total</span>
-            <span className="font-mono text-blue-600">
+          <div className="flex justify-between border-t border-gray-200 pt-1.5 font-semibold">
+            <span className="text-gray-800">Grand Total</span>
+            <span className="font-mono text-emerald-600">
               Rp {grandTotal.toFixed(2)}
             </span>
           </div>
@@ -234,7 +234,7 @@ export default function InvoiceForm({ onSaved }: Props) {
       <button
         onClick={handleSave}
         disabled={saving}
-        className="w-full rounded bg-blue-600 py-2 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium rounded-lg px-4 py-2.5 transition-colors shadow-sm disabled:cursor-not-allowed"
       >
         {saving ? "Saving…" : "Save Invoice"}
       </button>

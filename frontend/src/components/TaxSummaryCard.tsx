@@ -39,25 +39,25 @@ export function TaxSummaryCard({ data, loading, year }: TaxSummaryCardProps) {
   const totalRevenue = data.reduce((sum, d) => sum + d.revenue, 0);
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-700">
           Tax Summary {year}
         </h3>
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleDownload("pdf")}
             disabled={downloading !== null}
-            className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
           >
-            {downloading === "pdf" ? "Generating..." : "PDF"}
+            {downloading === "pdf" ? "Generating..." : "PDF Report"}
           </button>
           <button
             onClick={() => handleDownload("excel")}
             disabled={downloading !== null}
-            className="rounded-lg border border-green-300 px-3 py-1.5 text-xs font-medium text-green-600 hover:bg-green-50 disabled:opacity-50 transition-colors"
+            className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
           >
-            {downloading === "excel" ? "Generating..." : "Excel"}
+            {downloading === "excel" ? "Generating..." : "Export Excel"}
           </button>
         </div>
       </div>
@@ -73,21 +73,21 @@ export function TaxSummaryCard({ data, loading, year }: TaxSummaryCardProps) {
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-100">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+            <thead className="bg-gray-50 text-xs uppercase text-gray-600 tracking-wide">
               <tr>
-                <th className="px-3 py-2 text-left">Month</th>
-                <th className="px-3 py-2 text-right">Revenue</th>
-                <th className="px-3 py-2 text-right">Tax</th>
+                <th className="px-4 py-2.5 text-left font-medium">Month</th>
+                <th className="px-4 py-2.5 text-right font-medium">Revenue</th>
+                <th className="px-4 py-2.5 text-right font-medium">Tax</th>
               </tr>
             </thead>
             <tbody>
               {data.map((d) => (
-                <tr key={d.label} className="border-t border-gray-100">
-                  <td className="px-3 py-2 font-medium text-gray-700">{d.label}</td>
-                  <td className="px-3 py-2 text-right font-mono text-gray-600">
+                <tr key={d.label} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-2.5 font-medium text-gray-700">{d.label}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-gray-600">
                     {formatIDR(d.revenue)}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono text-amber-600 font-medium">
+                  <td className="px-4 py-2.5 text-right font-mono text-amber-600 font-medium">
                     {formatIDR(d.tax)}
                   </td>
                 </tr>
@@ -95,11 +95,11 @@ export function TaxSummaryCard({ data, loading, year }: TaxSummaryCardProps) {
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-                <td className="px-3 py-2 text-gray-700">Total</td>
-                <td className="px-3 py-2 text-right font-mono text-gray-800">
+                <td className="px-4 py-2.5 text-gray-700">Total</td>
+                <td className="px-4 py-2.5 text-right font-mono text-gray-800">
                   {formatIDR(totalRevenue)}
                 </td>
-                <td className="px-3 py-2 text-right font-mono text-amber-600">
+                <td className="px-4 py-2.5 text-right font-mono text-amber-600">
                   {formatIDR(totalTax)}
                 </td>
               </tr>

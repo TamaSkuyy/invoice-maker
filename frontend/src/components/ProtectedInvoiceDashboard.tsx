@@ -17,9 +17,9 @@ const TopClientsChart = lazy(() =>
 // Chart skeleton — ditampilkan saat chart component lagi di-load.
 function ChartSkeleton() {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
       <div className="h-64 flex items-center justify-center">
-        <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full" />
+        <div className="animate-spin h-6 w-6 border-2 border-green-500 border-t-transparent rounded-full" />
       </div>
     </div>
   );
@@ -169,28 +169,32 @@ export function ProtectedInvoiceDashboard({
   }
 
   return (
-    <>
+    <div className="bg-gray-50 min-h-screen">
       <Navbar user={user} onLogout={onLogout} />
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
 
         {/* ── Dashboard Section ─────────────────────────────────── */}
         <section className="mb-10">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Dashboard</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">Dashboard</h2>
 
           <DashboardCards data={overview} loading={analyticsLoading} />
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <Suspense fallback={<ChartSkeleton />}>
-              <RevenueChart
-                data={revenue}
-                loading={analyticsLoading}
-                year={selectedYear}
-                onYearChange={setSelectedYear}
-              />
-            </Suspense>
-            <Suspense fallback={<ChartSkeleton />}>
-              <TopClientsChart data={topClients} loading={analyticsLoading} />
-            </Suspense>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div className="lg:col-span-2">
+              <Suspense fallback={<ChartSkeleton />}>
+                <RevenueChart
+                  data={revenue}
+                  loading={analyticsLoading}
+                  year={selectedYear}
+                  onYearChange={setSelectedYear}
+                />
+              </Suspense>
+            </div>
+            <div className="lg:col-span-1">
+              <Suspense fallback={<ChartSkeleton />}>
+                <TopClientsChart data={topClients} loading={analyticsLoading} />
+              </Suspense>
+            </div>
           </div>
 
           <TaxSummaryCard data={taxSummary} loading={analyticsLoading} year={selectedYear} />
@@ -198,7 +202,7 @@ export function ProtectedInvoiceDashboard({
 
         {/* ── Invoice Section ───────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          <section className="bg-white rounded-xl shadow p-6">
+          <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <InvoiceForm onSaved={handleSaved} />
           </section>
 
@@ -206,27 +210,27 @@ export function ProtectedInvoiceDashboard({
             {preview ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-gray-700">
+                  <h2 className="text-lg font-semibold text-gray-700">
                     Invoice Preview
                   </h2>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleDownload(`/invoices/${preview.id}/pdf`, `invoice-${preview.id!.slice(0, 8)}.pdf`, "PDF")}
                       disabled={exporting !== null}
-                      className="rounded border border-green-600 px-3 py-1 text-sm text-green-600 hover:bg-green-50 disabled:opacity-50"
+                      className="rounded-lg border border-green-600 px-3 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50 disabled:opacity-50 transition-colors"
                     >
                       {exporting === "PDF" ? "Downloading..." : "Download PDF"}
                     </button>
                     <button
                       onClick={() => handleDownload(`/invoices/${preview.id}/csv`, `invoice-${preview.id!.slice(0, 8)}.csv`, "CSV")}
                       disabled={exporting !== null}
-                      className="rounded border border-gray-400 px-3 py-1 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                      className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
                     >
                       {exporting === "CSV" ? "Exporting..." : "CSV"}
                     </button>
                     <button
                       onClick={() => window.print()}
-                      className="rounded border border-blue-500 px-3 py-1 text-sm text-blue-500 hover:bg-blue-50"
+                      className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                     >
                       Print
                     </button>
@@ -235,8 +239,8 @@ export function ProtectedInvoiceDashboard({
                 <InvoicePreview invoice={preview} />
               </div>
             ) : (
-              <div className="flex h-64 items-center justify-center rounded-xl border-2 border-dashed border-gray-200 text-gray-400">
-                <p>Fill in the form and save to preview your invoice here.</p>
+              <div className="flex h-64 items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white text-gray-400">
+                <p className="text-sm">Fill in the form and save to preview your invoice here.</p>
               </div>
             )}
           </section>
@@ -246,129 +250,133 @@ export function ProtectedInvoiceDashboard({
         {!loading && savedInvoices.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-700">
+              <h2 className="text-lg font-semibold text-gray-700">
                 Saved Invoices
               </h2>
-              <button
-                onClick={() => handleDownload("/invoices/export/excel", "invoices.xlsx", "Excel")}
-                disabled={exporting !== null}
-                className="rounded border border-green-600 px-4 py-2 text-sm font-medium text-green-600 hover:bg-green-50 disabled:opacity-50"
-              >
-                {exporting === "Excel" ? "Exporting..." : "Export to Excel"}
-              </button>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-1 border rounded text-sm"
-              >
-                <option value="">All Status</option>
-                <option value="Draft">Draft</option>
-                <option value="Sent">Sent</option>
-                <option value="Paid">Paid</option>
-                <option value="Overdue">Overdue</option>
-                <option value="Cancelled">Cancelled</option>
-              </select>
+              <div className="flex items-center gap-3">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                  <option value="">All Status</option>
+                  <option value="Draft">Draft</option>
+                  <option value="Sent">Sent</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Overdue">Overdue</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+                <button
+                  onClick={() => handleDownload("/invoices/export/excel", "invoices.xlsx", "Excel")}
+                  disabled={exporting !== null}
+                  className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+                >
+                  {exporting === "Excel" ? "Exporting..." : "Export to Excel"}
+                </button>
+              </div>
             </div>
-            <div className="overflow-x-auto rounded-xl bg-white shadow">
+            <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white shadow-sm">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                <thead className="bg-gray-50 text-xs uppercase text-gray-600 tracking-wide">
                   <tr>
-                    <th className="px-4 py-3 text-left">ID</th>
-                    <th className="px-4 py-3 text-left">Client</th>
-                    <th className="px-4 py-3 text-left">Date</th>
-                    <th className="px-4 py-3 text-right">Total</th>
-                    <th className="px-4 py-3 text-center">Status</th>
-                    <th className="px-4 py-3"></th>
+                    <th className="px-4 py-3 text-left font-medium">ID</th>
+                    <th className="px-4 py-3 text-left font-medium">Client</th>
+                    <th className="px-4 py-3 text-left font-medium">Date</th>
+                    <th className="px-4 py-3 text-right font-medium">Total</th>
+                    <th className="px-4 py-3 text-center font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Actions</th>
+                    <th className="px-4 py-3 font-medium">Payment</th>
                   </tr>
                 </thead>
                 <tbody>
                   {savedInvoices.map((inv) => (
                     <tr
                       key={inv.id}
-                      className="border-t border-gray-100 hover:bg-gray-50"
+                      className="border-t border-gray-100 hover:bg-gray-50 transition-colors"
                     >
                       <td className="px-4 py-3 font-mono text-xs text-gray-500">
                         {inv.id}
                       </td>
-                      <td className="px-4 py-3 font-medium">
+                      <td className="px-4 py-3 font-medium text-gray-800">
                         {inv.client_name}
                       </td>
                       <td className="px-4 py-3 text-gray-500">{inv.date}</td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-blue-600">
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-600">
                         Rp {(inv.total_amount ?? 0).toFixed(2)}
                       </td>
-                      <td>
-                         <StatusBadge status={inv.status} />
+                      <td className="px-4 py-3 text-center">
+                        <StatusBadge status={inv.status} />
                       </td>
-                      <td className="px-4 py-3 text-right space-x-2">
-                        {inv.status === "Draft" && (
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          {inv.status === "Draft" && (
+                            <button
+                              onClick={() => inv.id && handleChangeStatus(inv.id, "Sent")}
+                              className="text-xs px-2.5 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+                            >
+                              Mark Sent
+                            </button>
+                          )}
+                          {(inv.status === "Draft" || inv.status === "Sent") && (
+                            <button
+                              onClick={() => inv.id && handleChangeStatus(inv.id, "Cancelled")}
+                              className="text-xs px-2.5 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          )}
                           <button
-                            onClick={() => inv.id && handleChangeStatus(inv.id, "Sent")}
-                            className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                            onClick={() => inv.id && handleDownload(`/invoices/${inv.id}/pdf`, `invoice-${inv.id.slice(0, 8)}.pdf`, "PDF")}
+                            disabled={exporting !== null}
+                            className="text-xs font-medium text-green-600 hover:text-green-500 transition-colors"
                           >
-                            Mark as Sent
+                            PDF
                           </button>
-                        )}
-                        {(inv.status === "Draft" || inv.status === "Sent") && (
                           <button
-                            onClick={() => inv.id && handleChangeStatus(inv.id, "Cancelled")}
-                            className="text-xs px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 ml-1"
+                            onClick={() => setPreview(inv)}
+                            className="text-xs font-medium text-blue-500 hover:text-blue-400 transition-colors"
                           >
-                            Cancel
+                            View
                           </button>
-                        )}
-                        <button
-                          onClick={() => inv.id && handleDownload(`/invoices/${inv.id}/pdf`, `invoice-${inv.id.slice(0, 8)}.pdf`, "PDF")}
-                          disabled={exporting !== null}
-                          className="text-green-600 hover:underline text-xs"
-                        >
-                          PDF
-                        </button>
-                        <button
-                          onClick={() => setPreview(inv)}
-                          className="text-blue-500 hover:underline"
-                        >
-                          View
-                        </button>
+                        </div>
                       </td>
-                      {/* Payment form */}
-                      <form onSubmit={(e) => { 
-                        e.preventDefault()
-                        const fd = new FormData(e.currentTarget)
-                        const amount = Number(fd.get("amount") ?? "0")
-                        const date = fd.get("date")?.toString() ?? ""
-                        const method = fd.get("method")?.toString() ?? "Transfer"
-                        if (inv.id) handleRecordPayment(inv.id, amount, date, method) }} className="mt-2 flex gap-2 text-sm">
-                        <input name="amount" type="number" placeholder="Amount" className="w-24 border px-1 rounded" />
-                        <input name="date" type="date" className="border px-1 rounded" />
-                        <select name="method" className="border px-1 rounded">
-                          <option>Transfer</option>
-                          <option>Cash</option>
-                          <option>Credit Card</option>
-                          <option>Check</option>
-                        </select>
-                        <button type="submit" className="px-2 py-0.5 bg-green-500 text-white rounded text-xs">
-                          Record Payment
-                        </button>
-                      </form>
+                      <td className="px-4 py-3">
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault()
+                            const fd = new FormData(e.currentTarget)
+                            const amount = Number(fd.get("amount") ?? "0")
+                            const date = fd.get("date")?.toString() ?? ""
+                            const method = fd.get("method")?.toString() ?? "Transfer"
+                            if (inv.id) handleRecordPayment(inv.id, amount, date, method)
+                          }}
+                          className="flex items-center gap-1.5"
+                        >
+                          <input name="amount" type="number" placeholder="Amount" className="w-20 border border-gray-300 rounded-md px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-500" />
+                          <input name="date" type="date" className="border border-gray-300 rounded-md px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-500" />
+                          <select name="method" className="border border-gray-300 rounded-md px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-500">
+                            <option>Transfer</option>
+                            <option>Cash</option>
+                            <option>Credit Card</option>
+                            <option>Check</option>
+                          </select>
+                          <button type="submit" className="px-2 py-1 bg-green-500 text-white rounded-md text-xs font-medium hover:bg-green-600 transition-colors whitespace-nowrap">
+                            Pay
+                          </button>
+                        </form>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-
-            {/* {payments[invoice.id]?.map((p: Payment) => (
-              <div key={p.id} className="text-xs text-gray-500 ml-2">
-                {p.date} — {formatIDR(p.amount)} via {p.method}
-              </div>
-            ))} */}
           </section>
         )}
 
         {loading && (
-          <div className="text-center text-gray-600">Loading invoices...</div>
+          <div className="text-center py-12 text-gray-500">Loading invoices...</div>
         )}
       </main>
-    </>
+    </div>
   );
 }

@@ -15,7 +15,7 @@ describe("LoginPage", () => {
   it("should render login form", () => {
     render(<LoginPage {...defaultProps} />);
 
-    expect(screen.getByText("Invoice Maker")).toBeInTheDocument();
+    expect(screen.getByText("Welcome Back")).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Login" })).toBeInTheDocument();

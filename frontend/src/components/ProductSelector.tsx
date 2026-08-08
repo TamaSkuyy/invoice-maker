@@ -41,20 +41,20 @@ export default function ProductSelector({ onPick }: Props) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="text-xs text-blue-500 hover:text-blue-700 hover:underline"
+        className="text-xs font-medium text-green-600 hover:text-green-500 transition-colors"
         title="Pick a saved product"
       >
         +Pick
       </button>
 
       {open && (
-        <div className="absolute left-0 top-6 z-10 w-64 rounded-lg border border-gray-200 bg-white shadow-lg py-1 max-h-48 overflow-y-auto">
+        <div className="absolute left-0 top-6 z-10 w-64 rounded-xl border border-gray-100 bg-white shadow-lg py-1 max-h-48 overflow-y-auto">
           {products.map((p) => (
             <button
               key={p.id}
               type="button"
               onClick={() => handlePick(p)}
-              className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex justify-between"
+              className="w-full text-left px-4 py-2 text-sm hover:bg-green-50 transition-colors flex justify-between"
             >
               <span className="text-gray-800 truncate mr-2">
                 {p.name}
@@ -64,11 +64,6 @@ export default function ProductSelector({ onPick }: Props) {
               </span>
             </button>
           ))}
-          {products.length === 0 && (
-            <p className="px-4 py-2 text-sm text-gray-400">
-              No products saved yet.
-            </p>
-          )}
         </div>
       )}
     </div>
